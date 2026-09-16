@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "upstream": {
+    "repository": "https://github.com/e2b-dev/infra",
+    "revision": "97d10b529fd506f2ea3ac6a262a8b453fd8cbb14",
+    "license": "Apache-2.0"
+  },
+  "modifications": ["agr-go-sdk internal go_package mapping", "prominent modification notice"],
+  "files": [
+    {"path": "proto/tool/filesystem/filesystem.proto", "sha256": "2fe882067a2691ad0486651548e7a5c9046eed1eb82b33557219e35a9192c54a"},
+    {"path": "proto/tool/process/process.proto", "sha256": "cc90c61c2f5114652341ad9c8882de0a451ba1a4f79b4c3551d679fd7745d56c"}
+  ],
+  "generators": {
+    "buf": "v1.47.2",
+    "protoc-gen-go": "v1.36.11",
+    "protoc-gen-connect-go": "v1.18.1"
+  }
+}

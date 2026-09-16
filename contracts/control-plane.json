@@ -1,0 +1,14 @@
+{
+  "service": "ags",
+  "version": "20250920",
+  "actions": [
+    {"name": "AcquireSandboxInstanceToken", "route": "official_typed"},
+    {"name": "DescribeSandboxInstanceList", "route": "official_typed"},
+    {"name": "PauseSandboxInstance", "route": "official_typed"},
+    {"name": "ResumeSandboxInstance", "route": "official_typed"},
+    {"name": "StartSandboxInstance", "route": "official_typed"},
+    {"name": "StopSandboxInstance", "route": "official_typed"},
+    {"name": "UpdateSandboxInstance", "route": "official_typed"}
+  ],
+  "raw_actions": []
+}

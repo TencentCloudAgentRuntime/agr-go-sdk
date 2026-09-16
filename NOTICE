@@ -1,0 +1,14 @@
+Tencent Cloud Agent Runtime Go SDK
+Copyright 2026 Tencent. All rights reserved.
+
+This project includes code migrated from TencentCloudAgentRuntime/ags-go-sdk
+at commit e21456e016ac9700bca6bd8bbdc51d3333f0447f under Apache-2.0.
+
+This product includes modified filesystem and process protocol definitions derived
+from the E2B Infrastructure project and used under the Apache License, Version 2.0.
+The copies in this repository add an internal agr-go-sdk Go package mapping and
+a prominent modification notice.
+
+Exact upstream revisions, file hashes, modifications, and generated-code relationships
+are recorded in SOURCE_ATTRIBUTION.md. Third-party runtime dependencies are listed in
+THIRD_PARTY.md and remain subject to their respective licenses.
