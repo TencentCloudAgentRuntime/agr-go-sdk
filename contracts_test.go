@@ -61,7 +61,7 @@ func TestOfficialControlPlaneCallsStayInsideActionContract(t *testing.T) {
 
 	used := map[string]bool{}
 	pattern := regexp.MustCompile(`ags\.New([A-Z][A-Za-z0-9]+)Request\(`)
-	for _, path := range []string{"internal/controlplane/cloudapi.go", "internal/controlplane/update.go"} {
+	for _, path := range []string{"internal/controlplane/cloudapi.go", "internal/controlplane/tools.go", "internal/controlplane/update.go"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

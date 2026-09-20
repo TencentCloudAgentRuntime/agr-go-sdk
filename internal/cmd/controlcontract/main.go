@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -30,28 +31,53 @@ const (
 )
 
 type actionRoute struct {
-	Name  string `json:"name"`
-	Route string `json:"route"`
+	Name     string `json:"name"`
+	Resource string `json:"resource"`
+	Maturity string `json:"maturity"`
+	Route    string `json:"route"`
+}
+
+type fieldMaturity struct {
+	Object   string `json:"object"`
+	Field    string `json:"field"`
+	Maturity string `json:"maturity"`
 }
 
 type routingContract struct {
-	Service    string        `json:"service"`
-	Version    string        `json:"version"`
-	Actions    []actionRoute `json:"actions"`
-	RawActions []string      `json:"raw_actions"`
+	Service       string          `json:"service"`
+	Version       string          `json:"version"`
+	SourceChannel string          `json:"source_channel"`
+	Actions       []actionRoute   `json:"actions"`
+	PreviewFields []fieldMaturity `json:"preview_fields"`
+	RawActions    []string        `json:"raw_actions"`
+}
+
+type manifestAction struct {
+	Name     string   `json:"name"`
+	Resource string   `json:"resource"`
+	Maturity string   `json:"maturity"`
+	Route    string   `json:"route"`
+	Request  string   `json:"request"`
+	Response string   `json:"response"`
+	Objects  []string `json:"objects"`
 }
 
 type manifest struct {
-	SchemaVersion            int    `json:"schema_version"`
-	SourceRepository         string `json:"source_repository"`
-	SourceRevision           string `json:"source_revision"`
-	SourcePath               string `json:"source_path"`
-	SourceAPIJSONSHA256      string `json:"source_schema_sha256"`
-	SourceAPIPatchJSONSHA256 string `json:"source_patch_sha256"`
-	SourceEffectiveSHA256    string `json:"source_effective_sha256"`
-	SDKEffectiveSHA256       string `json:"sdk_effective_sha256"`
-	SDKEffectiveActions      int    `json:"sdk_effective_actions"`
-	SDKEffectiveObjects      int    `json:"sdk_effective_objects"`
+	SchemaVersion            int              `json:"schema_version"`
+	SourceRepository         string           `json:"source_repository"`
+	SourceRevision           string           `json:"source_revision"`
+	SourceChannel            string           `json:"source_channel"`
+	APIVersion               string           `json:"api_version"`
+	SourcePath               string           `json:"source_path"`
+	SourceAPIJSONSHA256      string           `json:"source_schema_sha256"`
+	SourceAPIPatchJSONSHA256 string           `json:"source_patch_sha256"`
+	SourceEffectiveSHA256    string           `json:"source_effective_sha256"`
+	SDKEffectiveSHA256       string           `json:"sdk_effective_sha256"`
+	SDKEffectiveActions      int              `json:"sdk_effective_actions"`
+	SDKEffectiveObjects      int              `json:"sdk_effective_objects"`
+	FieldMaturityDefault     string           `json:"field_maturity_default"`
+	PreviewFields            []fieldMaturity  `json:"preview_fields"`
+	Actions                  []manifestAction `json:"actions"`
 }
 
 type apiContract struct {
@@ -189,7 +215,7 @@ func runVerify(args []string, stdout io.Writer) error {
 		}
 	}
 	wantSourcePath := filepath.ToSlash(filepath.Join("api", routing.Service, "v"+routing.Version))
-	if recorded.SchemaVersion != 1 || recorded.SourceRepository != sourceRepository || recorded.SourceRevision == "" || recorded.SourcePath != wantSourcePath {
+	if recorded.SchemaVersion != 2 || recorded.SourceRepository != sourceRepository || recorded.SourceRevision == "" || recorded.SourcePath != wantSourcePath || recorded.SourceChannel != routing.SourceChannel || recorded.APIVersion != routing.Version || recorded.FieldMaturityDefault != "stable" {
 		return errors.New("manifest source metadata is incomplete")
 	}
 	var api apiContract
@@ -202,6 +228,13 @@ func runVerify(args []string, stdout io.Writer) error {
 	}
 	if len(api.Actions) != recorded.SDKEffectiveActions || len(closure) != recorded.SDKEffectiveObjects {
 		return fmt.Errorf("manifest counts are %d actions/%d objects, snapshot has %d/%d", recorded.SDKEffectiveActions, recorded.SDKEffectiveObjects, len(api.Actions), len(closure))
+	}
+	wantActions, err := manifestActions(api, routing)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(recorded.Actions, wantActions) || !reflect.DeepEqual(recorded.PreviewFields, routing.PreviewFields) {
+		return errors.New("manifest action or field maturity metadata is stale")
 	}
 	if err := compareImplementationRoutes(routing); err != nil {
 		return err
@@ -241,17 +274,20 @@ func generateFromCLI(cliDir, revision string, routing routingContract) (generate
 	if err != nil {
 		return generatedContract{}, fmt.Errorf("read source api.patch.json: %w", err)
 	}
-	rendered, err := commandOutput(cliDir, "go", "run", "./cmd/internal/apipatch", "render", "--api", relativeAPIPath)
-	if err != nil {
-		return generatedContract{}, fmt.Errorf("render CLI effective API: %w", err)
+	selected := apiData
+	if routing.SourceChannel == "preview" {
+		selected, err = commandOutput(cliDir, "go", "run", "./cmd/internal/apipatch", "render", "--api", relativeAPIPath)
+		if err != nil {
+			return generatedContract{}, fmt.Errorf("render CLI preview API: %w", err)
+		}
 	}
-	compact, err := compactJSON(rendered)
+	compact, err := compactJSON(selected)
 	if err != nil {
 		return generatedContract{}, fmt.Errorf("compact CLI effective API: %w", err)
 	}
 	var full apiContract
-	if err := json.Unmarshal(rendered, &full); err != nil {
-		return generatedContract{}, fmt.Errorf("decode CLI effective API: %w", err)
+	if err := json.Unmarshal(selected, &full); err != nil {
+		return generatedContract{}, fmt.Errorf("decode CLI %s API: %w", routing.SourceChannel, err)
 	}
 	reduced, err := pruneContract(full, routing)
 	if err != nil {
@@ -261,12 +297,18 @@ func generateFromCLI(cliDir, revision string, routing routingContract) (generate
 	if err != nil {
 		return generatedContract{}, err
 	}
+	actions, err := manifestActions(reduced, routing)
+	if err != nil {
+		return generatedContract{}, err
+	}
 	recorded := manifest{
-		SchemaVersion: 1, SourceRepository: sourceRepository, SourceRevision: revision,
+		SchemaVersion: 2, SourceRepository: sourceRepository, SourceRevision: revision,
+		SourceChannel: routing.SourceChannel, APIVersion: routing.Version,
 		SourcePath:          filepath.ToSlash(relativeAPIPath),
 		SourceAPIJSONSHA256: digest(apiData), SourceAPIPatchJSONSHA256: digest(patchData),
 		SourceEffectiveSHA256: digest(compact), SDKEffectiveSHA256: digest(effective),
 		SDKEffectiveActions: len(reduced.Actions), SDKEffectiveObjects: len(reduced.Objects),
+		FieldMaturityDefault: "stable", PreviewFields: routing.PreviewFields, Actions: actions,
 	}
 	manifestData, err := marshalFile(recorded)
 	if err != nil {
@@ -284,7 +326,7 @@ func readRouting(root string) (routingContract, error) {
 	if err := json.Unmarshal(data, &routing); err != nil {
 		return routingContract{}, fmt.Errorf("decode action routing: %w", err)
 	}
-	if routing.Service == "" || routing.Version == "" || len(routing.Actions) == 0 {
+	if routing.Service == "" || routing.Version == "" || len(routing.Actions) == 0 || (routing.SourceChannel != "stable" && routing.SourceChannel != "preview") {
 		return routingContract{}, errors.New("action routing metadata is incomplete")
 	}
 	seen, raw := map[string]bool{}, map[string]bool{}
@@ -296,7 +338,7 @@ func readRouting(root string) (routingContract, error) {
 	}
 	previous := ""
 	for _, action := range routing.Actions {
-		if action.Name == "" || seen[action.Name] {
+		if action.Name == "" || action.Resource == "" || seen[action.Name] {
 			return routingContract{}, fmt.Errorf("duplicate or empty action %q", action.Name)
 		}
 		if previous != "" && action.Name < previous {
@@ -304,6 +346,12 @@ func readRouting(root string) (routingContract, error) {
 		}
 		if action.Route != string(controlplane.OfficialTyped) && action.Route != string(controlplane.CommonRaw) {
 			return routingContract{}, fmt.Errorf("action %s has unsupported route %q", action.Name, action.Route)
+		}
+		if action.Maturity != "stable" && action.Maturity != "preview" {
+			return routingContract{}, fmt.Errorf("action %s has unsupported maturity %q", action.Name, action.Maturity)
+		}
+		if routing.SourceChannel == "stable" && action.Maturity != "stable" {
+			return routingContract{}, fmt.Errorf("stable source cannot include preview action %s", action.Name)
 		}
 		if raw[action.Name] != (action.Route == string(controlplane.CommonRaw)) {
 			return routingContract{}, fmt.Errorf("action %s route and raw_actions disagree", action.Name)
@@ -315,7 +363,40 @@ func readRouting(root string) (routingContract, error) {
 			return routingContract{}, fmt.Errorf("raw action %s is not in the action registry", name)
 		}
 	}
+	for _, field := range routing.PreviewFields {
+		if field.Object == "" || field.Field == "" || field.Maturity != "preview" {
+			return routingContract{}, errors.New("preview field metadata is incomplete")
+		}
+		if routing.SourceChannel == "stable" {
+			return routingContract{}, errors.New("stable source cannot include preview fields")
+		}
+	}
 	return routing, nil
+}
+
+func manifestActions(api apiContract, routing routingContract) ([]manifestAction, error) {
+	out := make([]manifestAction, 0, len(routing.Actions))
+	for _, route := range routing.Actions {
+		raw, ok := api.Actions[route.Name]
+		if !ok {
+			return nil, fmt.Errorf("manifest action %s is absent", route.Name)
+		}
+		var shape actionShape
+		if err := json.Unmarshal(raw, &shape); err != nil {
+			return nil, fmt.Errorf("decode manifest action %s: %w", route.Name, err)
+		}
+		closure, err := reachableObjects(map[string]json.RawMessage{route.Name: raw}, api.Objects)
+		if err != nil {
+			return nil, err
+		}
+		objects := make([]string, 0, len(closure))
+		for name := range closure {
+			objects = append(objects, name)
+		}
+		sort.Strings(objects)
+		out = append(out, manifestAction{Name: route.Name, Resource: route.Resource, Maturity: route.Maturity, Route: route.Route, Request: shape.Input, Response: shape.Output, Objects: objects})
+	}
+	return out, nil
 }
 
 func pruneContract(full apiContract, routing routingContract) (apiContract, error) {

@@ -3,8 +3,8 @@ module github.com/TencentCloudAgentRuntime/agr-go-sdk
 go 1.22
 
 require (
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/ags v1.3.173
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.175
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/ags v1.3.179
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.179
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/monitor v1.3.171
 )
 

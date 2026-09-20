@@ -16,6 +16,12 @@ type cloudEnvironment struct {
 	codeToolID string
 }
 
+type a1CloudEnvironment struct {
+	cloudEnvironment
+	preCacheImage        string
+	preCacheRegistryType agr.ImageRegistryType
+}
+
 func requireCloudEnvironment(t *testing.T) cloudEnvironment {
 	t.Helper()
 	if os.Getenv("AGS_E2E") != "1" {
@@ -28,6 +34,28 @@ func requireCloudEnvironment(t *testing.T) cloudEnvironment {
 		}
 	}
 	return cloudEnvironment{region: os.Getenv("AGS_E2E_REGION"), toolID: os.Getenv("AGS_E2E_TOOL_ID"), codeToolID: os.Getenv("AGS_E2E_CODE_TOOL_ID")}
+}
+
+func requireA1CloudEnvironment(t *testing.T) a1CloudEnvironment {
+	t.Helper()
+	if os.Getenv("AGS_E2E") != "1" {
+		t.Fatal("real Cloud E2E requires AGS_E2E=1")
+	}
+	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY", "AGS_E2E_REGION"} {
+		if os.Getenv(name) == "" {
+			t.Fatalf("A0+A1 E2E requires %s", name)
+		}
+	}
+	image := os.Getenv("AGS_E2E_PRECACHE_IMAGE")
+	registry := agr.ImageRegistryType(os.Getenv("AGS_E2E_PRECACHE_REGISTRY_TYPE"))
+	if image == "" || (registry != agr.ImageRegistryEnterprise && registry != agr.ImageRegistryPersonal) {
+		t.Fatal("A0+A1 E2E requires AGS_E2E_PRECACHE_IMAGE and AGS_E2E_PRECACHE_REGISTRY_TYPE=enterprise|personal")
+	}
+	return a1CloudEnvironment{
+		cloudEnvironment:     cloudEnvironment{region: os.Getenv("AGS_E2E_REGION")},
+		preCacheImage:        image,
+		preCacheRegistryType: registry,
+	}
 }
 
 func newCloudClient(t *testing.T, environment cloudEnvironment) *agr.Client {
@@ -81,6 +109,35 @@ func deleteIDAndConfirm(t *testing.T, manager *agr.SandboxManager, id string) {
 			t.Errorf("confirm sandbox cleanup: %v", cleanup.Err())
 			return
 		case <-deadline.C:
+		}
+	}
+}
+
+func deleteToolAndConfirm(t *testing.T, manager *agr.ToolManager, id string) {
+	t.Helper()
+	cleanup, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	if err := manager.Delete(cleanup, id); err != nil {
+		t.Errorf("delete tool: %v", err)
+		return
+	}
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		_, err := manager.Get(cleanup, id)
+		if err != nil {
+			var failure *agr.Error
+			if errors.As(err, &failure) && failure.Code == agr.NotFound {
+				return
+			}
+			t.Errorf("confirm tool cleanup: %v", err)
+			return
+		}
+		select {
+		case <-cleanup.Done():
+			t.Errorf("confirm tool cleanup: %v", cleanup.Err())
+			return
+		case <-ticker.C:
 		}
 	}
 }

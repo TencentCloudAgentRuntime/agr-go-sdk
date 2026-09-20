@@ -77,6 +77,27 @@ func (c *controlAdapter) List(ctx context.Context, opts SandboxListOptions) (San
 	return SandboxPage{Items: items, TotalCount: out.TotalCount, NextOffset: nextPtr}, nil
 }
 
+func (c *controlAdapter) ListPage(ctx context.Context, opts SandboxPageOptions) (SandboxCursorPage, error) {
+	in, err := controlCursorListRequest(opts)
+	if err != nil {
+		return SandboxCursorPage{}, err
+	}
+	out, err := c.service.ListPage(ctx, in)
+	if err != nil {
+		return SandboxCursorPage{}, normalizeError("Sandboxes.ListPage", err)
+	}
+	items := make([]SandboxInfo, 0, len(out.Items))
+	for _, item := range out.Items {
+		items = append(items, sandboxInfoFrom(item))
+	}
+	page := SandboxCursorPage{Items: items, NextToken: out.NextToken}
+	if opts.NeedTotalCount {
+		total := out.TotalCount
+		page.TotalCount = &total
+	}
+	return page, nil
+}
+
 func (c *controlAdapter) Pause(ctx context.Context, id string, opts PauseOptions) (SandboxInfo, error) {
 	out, err := c.service.Pause(ctx, id, opts.Mode != PauseDisk)
 	return sandboxInfoFrom(out), normalizeError("", err)
@@ -110,6 +131,249 @@ func (c *controlAdapter) Update(ctx context.Context, id string, opts UpdateOptio
 		return nil
 	}
 	return mapMutationError(id, err)
+}
+
+func (c *controlAdapter) CreateTool(ctx context.Context, opts CreateToolOptions) (ToolMutationResult, error) {
+	out, err := c.service.CreateTool(ctx, controlCreateTool(opts))
+	if err != nil {
+		return ToolMutationResult{}, normalizeError("Tools.Create", err)
+	}
+	return ToolMutationResult{ToolID: out.ToolID, RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) GetTool(ctx context.Context, id string) (ToolInfo, error) {
+	out, err := c.service.GetTool(ctx, id)
+	if err != nil {
+		return ToolInfo{}, withResourceError(normalizeError("Tools.Get", err), "tool", id)
+	}
+	return toolInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListTools(ctx context.Context, opts ToolListOptions) (ToolPage, error) {
+	in := controlplane.ToolListRequest{ToolIDs: opts.ToolIDs, Offset: opts.Offset, Limit: opts.Limit}
+	for _, filter := range opts.Filters {
+		in.Filters = append(in.Filters, controlplane.ToolFilter{Name: filter.Name, Values: filter.Values})
+	}
+	out, err := c.service.ListTools(ctx, in)
+	if err != nil {
+		return ToolPage{}, normalizeError("Tools.List", err)
+	}
+	page := ToolPage{TotalCount: out.TotalCount, Items: make([]ToolInfo, 0, len(out.Items))}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, toolInfoFrom(item))
+	}
+	next := opts.Offset + len(page.Items)
+	if next < out.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateTool(ctx context.Context, id string, opts UpdateToolOptions) (ToolMutationResult, error) {
+	out, err := c.service.UpdateTool(ctx, id, controlUpdateTool(opts))
+	if err != nil {
+		return ToolMutationResult{}, withResourceError(normalizeError("Tools.Update", err), "tool", id)
+	}
+	return ToolMutationResult{ToolID: out.ToolID, RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) DeleteTool(ctx context.Context, id string) error {
+	return withResourceError(normalizeError("Tools.Delete", c.service.DeleteTool(ctx, id)), "tool", id)
+}
+
+func (c *controlAdapter) CreatePreCacheImage(ctx context.Context, opts CreatePreCacheImageOptions) (PreCacheImageResult, error) {
+	out, err := c.service.CreatePreCacheImage(ctx, opts.Image, string(opts.RegistryType))
+	if err != nil {
+		return PreCacheImageResult{}, normalizeError("PreCacheImages.Create", err)
+	}
+	return PreCacheImageResult{Ref: preCacheRefFrom(out.Ref), RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) GetPreCacheImage(ctx context.Context, ref PreCacheImageRef) (PreCacheImageInfo, error) {
+	out, err := c.service.GetPreCacheImage(ctx, controlplane.PreCacheImageRef{Image: ref.Image, Digest: ref.Digest, RegistryType: string(ref.RegistryType)})
+	if err != nil {
+		return PreCacheImageInfo{}, normalizeError("PreCacheImages.Get", err)
+	}
+	return PreCacheImageInfo{Ref: preCacheRefFrom(out.Ref), Status: out.Status, Message: out.Message, RequestID: out.RequestID}, nil
+}
+
+func controlCreateTool(value CreateToolOptions) controlplane.CreateToolRequest {
+	out := controlplane.CreateToolRequest{Name: value.Name, Type: string(value.Type), Description: value.Description, DefaultTimeout: value.DefaultTimeout, ClientToken: value.ClientToken, RoleARN: value.RoleARN, Network: controlToolNetwork(value.Network), Persistent: value.Persistent}
+	for _, tag := range value.Tags {
+		out.Tags = append(out.Tags, controlplane.ToolTag{Key: tag.Key, Value: tag.Value})
+	}
+	out.StorageMounts = controlToolMounts(value.StorageMounts)
+	out.Custom, out.Computer, out.Log = controlToolCustom(value.CustomConfiguration), controlToolComputer(value.ComputerConfiguration), controlToolLog(value.LogConfiguration)
+	return out
+}
+
+func controlUpdateTool(value UpdateToolOptions) controlplane.UpdateToolRequest {
+	out := controlplane.UpdateToolRequest{Description: value.Description, Custom: controlToolCustom(value.CustomConfiguration), Computer: controlToolComputer(value.ComputerConfiguration)}
+	if value.Network != nil {
+		network := controlToolNetwork(*value.Network)
+		out.Network = &network
+	}
+	if value.Tags != nil {
+		tags := make([]controlplane.ToolTag, 0, len(*value.Tags))
+		for _, tag := range *value.Tags {
+			tags = append(tags, controlplane.ToolTag{Key: tag.Key, Value: tag.Value})
+		}
+		out.Tags = &tags
+	}
+	return out
+}
+
+func controlToolNetwork(value ToolNetworkConfiguration) controlplane.ToolNetwork {
+	out := controlplane.ToolNetwork{Mode: string(value.Mode)}
+	if value.VPC != nil {
+		out.VPC = &controlplane.ToolVPC{SubnetIDs: value.VPC.SubnetIDs, SecurityGroupIDs: value.VPC.SecurityGroupIDs}
+	}
+	return out
+}
+func controlToolCustom(value *ToolCustomConfiguration) *controlplane.ToolCustom {
+	if value == nil {
+		return nil
+	}
+	out := &controlplane.ToolCustom{Image: value.Image, RegistryType: string(value.ImageRegistryType), Command: value.Command, Args: value.Args}
+	for _, v := range value.Env {
+		out.Env = append(out.Env, controlplane.ToolEnv{Name: v.Name, Value: v.Value})
+	}
+	for _, v := range value.Ports {
+		out.Ports = append(out.Ports, controlplane.ToolPort{Name: v.Name, Protocol: v.Protocol, Port: v.Port})
+	}
+	if value.Resources != nil {
+		out.Resources = &controlplane.ToolResources{CPU: value.Resources.CPU, Memory: value.Resources.Memory, Storage: value.Resources.Storage}
+	}
+	if value.Probe != nil {
+		out.Probe = &controlplane.ToolProbe{ReadyTimeoutMS: value.Probe.ReadyTimeoutMS, ProbeTimeoutMS: value.Probe.ProbeTimeoutMS, ProbePeriodMS: value.Probe.ProbePeriodMS, SuccessThreshold: value.Probe.SuccessThreshold, FailureThreshold: value.Probe.FailureThreshold}
+		if value.Probe.HTTPGet != nil {
+			out.Probe.HTTPGet = &controlplane.ToolHTTPGet{Path: value.Probe.HTTPGet.Path, Scheme: value.Probe.HTTPGet.Scheme, Port: value.Probe.HTTPGet.Port}
+		}
+	}
+	if value.DNS != nil {
+		out.DNS = &controlplane.ToolDNS{Servers: value.DNS.Servers, Searches: value.DNS.Searches, Options: value.DNS.Options}
+	}
+	return out
+}
+func controlToolComputer(value *ToolComputerConfiguration) *controlplane.ToolComputer {
+	if value == nil {
+		return nil
+	}
+	return &controlplane.ToolComputer{WAAImageID: value.WAAImageID, OSWorldVersion: value.OSWorldVersion}
+}
+func controlToolLog(value *ToolLogConfiguration) *controlplane.ToolLog {
+	if value == nil {
+		return nil
+	}
+	return &controlplane.ToolLog{CLSTopicID: value.CLSTopicID, Files: value.Files}
+}
+func controlToolMounts(values []ToolStorageMount) []controlplane.ToolStorageMount {
+	out := make([]controlplane.ToolStorageMount, 0, len(values))
+	for _, v := range values {
+		item := controlplane.ToolStorageMount{Name: v.Name, MountPath: v.MountPath, ReadOnly: v.ReadOnly}
+		if v.Source != nil {
+			source := &controlplane.ToolStorageSource{}
+			if v.Source.COS != nil {
+				source.COS = &controlplane.ToolCOS{Endpoint: v.Source.COS.Endpoint, BucketName: v.Source.COS.BucketName, BucketPath: v.Source.COS.BucketPath}
+			}
+			if v.Source.CFS != nil {
+				source.CFS = &controlplane.ToolCFS{FileSystemID: v.Source.CFS.FileSystemID, Path: v.Source.CFS.Path}
+			}
+			if v.Source.Image != nil {
+				source.Image = &controlplane.ToolImage{Reference: v.Source.Image.Reference, RegistryType: v.Source.Image.ImageRegistryType, SubPath: v.Source.Image.SubPath, Digest: v.Source.Image.Digest}
+			}
+			if v.Source.AgentBucket != nil {
+				source.AgentBucket = &controlplane.ToolAgentBucket{LibraryID: v.Source.AgentBucket.LibraryID, SpaceID: v.Source.AgentBucket.SpaceID, AccessDomain: v.Source.AgentBucket.AccessDomain}
+			}
+			item.Source = source
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func toolInfoFrom(value controlplane.Tool) ToolInfo {
+	out := ToolInfo{ID: value.ID, Name: value.Name, Type: ToolType(value.Type), State: ToolState(value.Status), Description: value.Description, Persistent: value.Persistent, DefaultTimeoutSeconds: value.DefaultTimeoutSeconds, Network: toolNetworkFrom(value.Network), CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, RoleARN: value.RoleARN, StatusReason: value.StatusReason, CustomConfiguration: toolCustomFrom(value.Custom), ComputerConfiguration: toolComputerFrom(value.Computer), LogConfiguration: toolLogFrom(value.Log)}
+	for _, tag := range value.Tags {
+		out.Tags = append(out.Tags, ToolTag{Key: tag.Key, Value: tag.Value})
+	}
+	out.StorageMounts = toolMountsFrom(value.StorageMounts)
+	return out
+}
+func toolNetworkFrom(value controlplane.ToolNetwork) ToolNetworkConfiguration {
+	out := ToolNetworkConfiguration{Mode: ToolNetworkMode(value.Mode)}
+	if value.VPC != nil {
+		out.VPC = &ToolVPCConfiguration{SubnetIDs: append([]string(nil), value.VPC.SubnetIDs...), SecurityGroupIDs: append([]string(nil), value.VPC.SecurityGroupIDs...)}
+	}
+	return out
+}
+func toolCustomFrom(value *controlplane.ToolCustom) *ToolCustomConfigurationInfo {
+	if value == nil {
+		return nil
+	}
+	out := &ToolCustomConfigurationInfo{ToolCustomConfiguration: ToolCustomConfiguration{Image: value.Image, ImageRegistryType: ImageRegistryType(value.RegistryType), Command: append([]string(nil), value.Command...), Args: append([]string(nil), value.Args...)}, ImageDigest: value.ImageDigest}
+	for _, v := range value.Env {
+		out.Env = append(out.Env, ToolEnvironmentVariable{Name: v.Name, Value: v.Value})
+	}
+	for _, v := range value.Ports {
+		out.Ports = append(out.Ports, ToolPortConfiguration{Name: v.Name, Protocol: v.Protocol, Port: v.Port})
+	}
+	if value.Resources != nil {
+		out.Resources = &ToolResourceConfiguration{CPU: value.Resources.CPU, Memory: value.Resources.Memory, Storage: value.Resources.Storage}
+	}
+	if value.Probe != nil {
+		out.Probe = &ToolProbeConfiguration{ReadyTimeoutMS: value.Probe.ReadyTimeoutMS, ProbeTimeoutMS: value.Probe.ProbeTimeoutMS, ProbePeriodMS: value.Probe.ProbePeriodMS, SuccessThreshold: value.Probe.SuccessThreshold, FailureThreshold: value.Probe.FailureThreshold}
+		if value.Probe.HTTPGet != nil {
+			out.Probe.HTTPGet = &ToolHTTPGetAction{Path: value.Probe.HTTPGet.Path, Scheme: value.Probe.HTTPGet.Scheme, Port: value.Probe.HTTPGet.Port}
+		}
+	}
+	if value.DNS != nil {
+		out.DNS = &ToolDNSConfiguration{Servers: append([]string(nil), value.DNS.Servers...), Searches: append([]string(nil), value.DNS.Searches...), Options: append([]string(nil), value.DNS.Options...)}
+	}
+	return out
+}
+func toolComputerFrom(value *controlplane.ToolComputer) *ToolComputerConfiguration {
+	if value == nil {
+		return nil
+	}
+	return &ToolComputerConfiguration{WAAImageID: value.WAAImageID, OSWorldVersion: value.OSWorldVersion}
+}
+func toolLogFrom(value *controlplane.ToolLog) *ToolLogConfiguration {
+	if value == nil {
+		return nil
+	}
+	return &ToolLogConfiguration{CLSTopicID: value.CLSTopicID, Files: append([]string(nil), value.Files...)}
+}
+func toolMountsFrom(values []controlplane.ToolStorageMount) []ToolStorageMount {
+	out := make([]ToolStorageMount, 0, len(values))
+	for _, v := range values {
+		item := ToolStorageMount{Name: v.Name, MountPath: v.MountPath}
+		if v.ReadOnly != nil {
+			b := *v.ReadOnly
+			item.ReadOnly = &b
+		}
+		if v.Source != nil {
+			source := &ToolStorageSource{}
+			if v.Source.COS != nil {
+				source.COS = &ToolCOSStorage{Endpoint: v.Source.COS.Endpoint, BucketName: v.Source.COS.BucketName, BucketPath: v.Source.COS.BucketPath}
+			}
+			if v.Source.CFS != nil {
+				source.CFS = &ToolCFSStorage{FileSystemID: v.Source.CFS.FileSystemID, Path: v.Source.CFS.Path}
+			}
+			if v.Source.Image != nil {
+				source.Image = &ToolImageStorage{Reference: v.Source.Image.Reference, ImageRegistryType: v.Source.Image.RegistryType, SubPath: v.Source.Image.SubPath, Digest: v.Source.Image.Digest}
+			}
+			if v.Source.AgentBucket != nil {
+				source.AgentBucket = &ToolAgentBucketStorage{LibraryID: v.Source.AgentBucket.LibraryID, SpaceID: v.Source.AgentBucket.SpaceID, AccessDomain: v.Source.AgentBucket.AccessDomain}
+			}
+			item.Source = source
+		}
+		out = append(out, item)
+	}
+	return out
+}
+func preCacheRefFrom(value controlplane.PreCacheImageRef) PreCacheImageRef {
+	return PreCacheImageRef{Image: value.Image, Digest: value.Digest, RegistryType: ImageRegistryType(value.RegistryType)}
 }
 
 func mapMutationError(id string, err error) error {
@@ -167,6 +431,29 @@ func copyListOptions(opts SandboxListOptions) SandboxListOptions {
 	}
 	opts.Metadata = metadata
 	return opts
+}
+
+func copyPageOptions(opts SandboxPageOptions) SandboxPageOptions {
+	opts.Filter.InstanceIDs = append([]string(nil), opts.Filter.InstanceIDs...)
+	opts.Filter.States = append([]SandboxState(nil), opts.Filter.States...)
+	metadata := make(map[string][]string, len(opts.Filter.Metadata))
+	for key, values := range opts.Filter.Metadata {
+		metadata[key] = append([]string(nil), values...)
+	}
+	opts.Filter.Metadata = metadata
+	return opts
+}
+
+func controlCursorListRequest(opts SandboxPageOptions) (controlplane.CursorListRequest, error) {
+	legacy := SandboxListOptions{ToolID: opts.Filter.ToolID, States: opts.Filter.States, Metadata: opts.Filter.Metadata}
+	filters, err := controlListRequest(legacy)
+	if err != nil {
+		if typed, ok := err.(*Error); ok {
+			typed.Operation = "Sandboxes.ListPage"
+		}
+		return controlplane.CursorListRequest{}, err
+	}
+	return controlplane.CursorListRequest{InstanceIDs: opts.Filter.InstanceIDs, ToolID: filters.ToolID, MaxResults: opts.MaxResults, NextToken: opts.NextToken, NeedTotalCount: opts.NeedTotalCount, States: filters.States, Metadata: filters.Metadata}, nil
 }
 
 func controlListRequest(opts SandboxListOptions) (controlplane.ListRequest, error) {

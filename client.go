@@ -86,12 +86,20 @@ func noRedirectClient(client *http.Client) *http.Client {
 // Client binds region, providers, endpoints and HTTP configuration. Construct with NewClient;
 // do not replace its public service pointer concurrently.
 type Client struct {
-	cfg       clientConfig
-	sandboxes *SandboxManager
+	cfg            clientConfig
+	sandboxes      *SandboxManager
+	tools          *ToolManager
+	preCacheImages *PreCacheImageManager
 }
 
 // Sandboxes returns the sandbox control service bound to this client's Cloud identity.
 func (c *Client) Sandboxes() *SandboxManager { return c.sandboxes }
+
+// Tools returns the sandbox-tool control service bound to this client's Cloud identity.
+func (c *Client) Tools() *ToolManager { return c.tools }
+
+// PreCacheImages returns the image pre-cache service bound to this client's Cloud identity.
+func (c *Client) PreCacheImages() *PreCacheImageManager { return c.preCacheImages }
 
 // NewClient constructs a client without creating a sandbox. Region defaults from
 // TENCENTCLOUD_REGION; request timeout defaults to 30 seconds. Explicit control credentials
@@ -127,6 +135,8 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 	out := &Client{cfg: c}
 	out.sandboxes = &SandboxManager{client: out}
+	out.tools = &ToolManager{client: out}
+	out.preCacheImages = &PreCacheImageManager{client: out}
 	return out, nil
 }
 
@@ -232,6 +242,31 @@ func (m *SandboxManager) List(ctx context.Context, opts SandboxListOptions) (San
 	}
 	opts = copyListOptions(opts)
 	return m.client.cfg.control.List(ctx, opts)
+}
+
+// ListPage returns one cursor-based Cloud page. A nonempty NextToken must be passed unchanged
+// with the same query parameters; the SDK does not parse, restart, or aggregate cursors.
+func (m *SandboxManager) ListPage(ctx context.Context, opts SandboxPageOptions) (SandboxCursorPage, error) {
+	if opts.MaxResults == 0 {
+		opts.MaxResults = 20
+	}
+	if opts.MaxResults < 1 || opts.MaxResults > 100 {
+		return SandboxCursorPage{}, codeError(InvalidArgument, "Sandboxes.ListPage", "MAX_RESULTS_OUT_OF_RANGE")
+	}
+	if len(opts.Filter.InstanceIDs) > 100 {
+		return SandboxCursorPage{}, codeError(InvalidArgument, "Sandboxes.ListPage", "TOO_MANY_INSTANCE_IDS")
+	}
+	for _, id := range opts.Filter.InstanceIDs {
+		if id == "" {
+			return SandboxCursorPage{}, codeError(InvalidArgument, "Sandboxes.ListPage", "INSTANCE_ID_REQUIRED")
+		}
+	}
+	opts = copyPageOptions(opts)
+	cursor, ok := m.client.cfg.control.(cursorControlPlane)
+	if !ok {
+		return SandboxCursorPage{}, codeError(Unsupported, "Sandboxes.ListPage", "CURSOR_PAGINATION_UNAVAILABLE")
+	}
+	return cursor.ListPage(ctx, opts)
 }
 func (m *SandboxManager) connected(ctx context.Context, info SandboxInfo) (*Sandbox, error) {
 	for info.State != Running {

@@ -1,12 +1,262 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source_repository": "https://github.com/TencentCloudAgentRuntime/ags-cli",
-  "source_revision": "faf0164263075bf957722c70d42ad48b2946ec16",
+  "source_revision": "c8ca7d347f667266b44419c62272dcf31fb2febe",
+  "source_channel": "stable",
+  "api_version": "20250920",
   "source_path": "api/ags/v20250920",
-  "source_schema_sha256": "0c91b8941f58e3f0b3379877b970b08229a630b32ddf77ae8134033284dcf3f5",
-  "source_patch_sha256": "cef06a6d180f950924f14907ac3563d181aefb602308397a9aa661c138cde554",
-  "source_effective_sha256": "31c02e358aa7b9fa22cb0f7e2e2b2a639d0692163da390d397ec51a20c056a6f",
-  "sdk_effective_sha256": "982e546ecfe44c839baa576b39c7453485fb7a1dc94633e6bab065b546a6904d",
-  "sdk_effective_actions": 7,
-  "sdk_effective_objects": 28
+  "source_schema_sha256": "d09e09e9a53ef59521c36f7c3cd5eeb78ce4aef64b0832ba4862abe82a183744",
+  "source_patch_sha256": "56544a0b5b4a14c59a1caedfc74d9486358fd42e6868d95f15e2a33b4ed09ef0",
+  "source_effective_sha256": "e376a9e70698d3d7c3cc90748c9396307c25ae60fb6be7086904d98e78665ff5",
+  "sdk_effective_sha256": "9568a8d90a9ca009686c28c3fcb65e26f7603937d27cf8e6d87409de5b04e7c1",
+  "sdk_effective_actions": 13,
+  "sdk_effective_objects": 54,
+  "field_maturity_default": "stable",
+  "preview_fields": [],
+  "actions": [
+    {
+      "name": "AcquireSandboxInstanceToken",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "AcquireSandboxInstanceTokenRequest",
+      "response": "AcquireSandboxInstanceTokenResponse",
+      "objects": [
+        "AcquireSandboxInstanceTokenRequest",
+        "AcquireSandboxInstanceTokenResponse"
+      ]
+    },
+    {
+      "name": "CreatePreCacheImageTask",
+      "resource": "pre_cache_image",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "CreatePreCacheImageTaskRequest",
+      "response": "CreatePreCacheImageTaskResponse",
+      "objects": [
+        "CreatePreCacheImageTaskRequest",
+        "CreatePreCacheImageTaskResponse"
+      ]
+    },
+    {
+      "name": "CreateSandboxTool",
+      "resource": "tool",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "CreateSandboxToolRequest",
+      "response": "CreateSandboxToolResponse",
+      "objects": [
+        "AgentBucketStorageSource",
+        "CLSConfig",
+        "CfsStorageSource",
+        "ComputerConfiguration",
+        "CosStorageSource",
+        "CreateSandboxToolRequest",
+        "CreateSandboxToolResponse",
+        "CustomConfiguration",
+        "DNSConfig",
+        "EnvVar",
+        "HttpGetAction",
+        "ImageStorageSource",
+        "LogConfiguration",
+        "LogSources",
+        "NetworkConfiguration",
+        "OSWorldConfiguration",
+        "PortConfiguration",
+        "ProbeConfiguration",
+        "ResourceConfiguration",
+        "StorageMount",
+        "StorageSource",
+        "Tag",
+        "VPCConfig",
+        "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "DeleteSandboxTool",
+      "resource": "tool",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DeleteSandboxToolRequest",
+      "response": "DeleteSandboxToolResponse",
+      "objects": [
+        "DeleteSandboxToolRequest",
+        "DeleteSandboxToolResponse"
+      ]
+    },
+    {
+      "name": "DescribePreCacheImageTask",
+      "resource": "pre_cache_image",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DescribePreCacheImageTaskRequest",
+      "response": "DescribePreCacheImageTaskResponse",
+      "objects": [
+        "DescribePreCacheImageTaskRequest",
+        "DescribePreCacheImageTaskResponse"
+      ]
+    },
+    {
+      "name": "DescribeSandboxInstanceList",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DescribeSandboxInstanceListRequest",
+      "response": "DescribeSandboxInstanceListResponse",
+      "objects": [
+        "ComputerConfiguration",
+        "CustomConfigurationDetail",
+        "DNSConfig",
+        "DescribeSandboxInstanceListRequest",
+        "DescribeSandboxInstanceListResponse",
+        "EnvVar",
+        "Filter",
+        "HttpGetAction",
+        "MetadataVar",
+        "MountOption",
+        "OSWorldConfiguration",
+        "PortConfiguration",
+        "ProbeConfiguration",
+        "ResourceConfiguration",
+        "SandboxInstance",
+        "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "DescribeSandboxToolList",
+      "resource": "tool",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DescribeSandboxToolListRequest",
+      "response": "DescribeSandboxToolListResponse",
+      "objects": [
+        "AgentBucketStorageSource",
+        "CLSConfig",
+        "CfsStorageSource",
+        "ComputerConfiguration",
+        "CosStorageSource",
+        "CustomConfigurationDetail",
+        "DNSConfig",
+        "DescribeSandboxToolListRequest",
+        "DescribeSandboxToolListResponse",
+        "EnvVar",
+        "Filter",
+        "HttpGetAction",
+        "ImageStorageSource",
+        "LogConfiguration",
+        "LogSources",
+        "NetworkConfiguration",
+        "OSWorldConfiguration",
+        "PortConfiguration",
+        "ProbeConfiguration",
+        "ResourceConfiguration",
+        "SandboxTool",
+        "StorageMount",
+        "StorageSource",
+        "Tag",
+        "VPCConfig",
+        "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "PauseSandboxInstance",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "PauseSandboxInstanceRequest",
+      "response": "PauseSandboxInstanceResponse",
+      "objects": [
+        "PauseSandboxInstanceRequest",
+        "PauseSandboxInstanceResponse"
+      ]
+    },
+    {
+      "name": "ResumeSandboxInstance",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "ResumeSandboxInstanceRequest",
+      "response": "ResumeSandboxInstanceResponse",
+      "objects": [
+        "ResumeSandboxInstanceRequest",
+        "ResumeSandboxInstanceResponse"
+      ]
+    },
+    {
+      "name": "StartSandboxInstance",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "StartSandboxInstanceRequest",
+      "response": "StartSandboxInstanceResponse",
+      "objects": [
+        "ComputerConfiguration",
+        "CustomConfiguration",
+        "CustomConfigurationDetail",
+        "DNSConfig",
+        "EnvVar",
+        "HttpGetAction",
+        "MetadataVar",
+        "MountOption",
+        "OSWorldConfiguration",
+        "PortConfiguration",
+        "ProbeConfiguration",
+        "ResourceConfiguration",
+        "SandboxInstance",
+        "StartSandboxInstanceRequest",
+        "StartSandboxInstanceResponse",
+        "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "StopSandboxInstance",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "StopSandboxInstanceRequest",
+      "response": "StopSandboxInstanceResponse",
+      "objects": [
+        "StopSandboxInstanceRequest",
+        "StopSandboxInstanceResponse"
+      ]
+    },
+    {
+      "name": "UpdateSandboxInstance",
+      "resource": "sandbox",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "UpdateSandboxInstanceRequest",
+      "response": "UpdateSandboxInstanceResponse",
+      "objects": [
+        "MetadataVar",
+        "UpdateSandboxInstanceRequest",
+        "UpdateSandboxInstanceResponse"
+      ]
+    },
+    {
+      "name": "UpdateSandboxTool",
+      "resource": "tool",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "UpdateSandboxToolRequest",
+      "response": "UpdateSandboxToolResponse",
+      "objects": [
+        "ComputerConfiguration",
+        "CustomConfiguration",
+        "DNSConfig",
+        "EnvVar",
+        "HttpGetAction",
+        "NetworkConfiguration",
+        "OSWorldConfiguration",
+        "PortConfiguration",
+        "ProbeConfiguration",
+        "ResourceConfiguration",
+        "Tag",
+        "UpdateSandboxToolRequest",
+        "UpdateSandboxToolResponse",
+        "VPCConfig",
+        "WAAConfiguration"
+      ]
+    }
+  ]
 }

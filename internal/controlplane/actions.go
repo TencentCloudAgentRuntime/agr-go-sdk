@@ -15,10 +15,16 @@ var actionRoutes = map[string]ActionRoute{
 	"StartSandboxInstance":        OfficialTyped,
 	"DescribeSandboxInstanceList": OfficialTyped,
 	"AcquireSandboxInstanceToken": OfficialTyped,
+	"CreatePreCacheImageTask":     OfficialTyped,
+	"CreateSandboxTool":           OfficialTyped,
+	"DeleteSandboxTool":           OfficialTyped,
+	"DescribePreCacheImageTask":   OfficialTyped,
+	"DescribeSandboxToolList":     OfficialTyped,
 	"PauseSandboxInstance":        OfficialTyped,
 	"ResumeSandboxInstance":       OfficialTyped,
 	"StopSandboxInstance":         OfficialTyped,
 	"UpdateSandboxInstance":       OfficialTyped,
+	"UpdateSandboxTool":           OfficialTyped,
 }
 
 // ActionRoutes returns a copy of the approved static action registry. The package exposes no

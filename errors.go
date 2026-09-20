@@ -63,12 +63,15 @@ type Error struct {
 	// InstanceID is set when creation was accepted but waiting/connecting failed.
 	// The instance may still exist; the SDK never assumes ownership of a replay.
 	InstanceID string
+	// ResourceType and ResourceID identify a non-Sandbox resource involved in the failure.
+	// They are diagnostic evidence and are deliberately omitted from formatted errors.
+	ResourceType, ResourceID string
 	// Mutation is optional evidence for a failed update; nil does not mean NOT_SENT.
 	Mutation *MutationInfo
 }
 
 // Error formats the operation, category and diagnostic reason without rendering Cause,
-// InstanceID or a raw response.
+// InstanceID, ResourceID, or a raw response.
 func (e *Error) Error() string {
 	if e.Reason != "" {
 		return fmt.Sprintf("ags %s (%s): %s", e.Operation, e.Code, e.Reason)

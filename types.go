@@ -119,6 +119,43 @@ type SandboxPage struct {
 	NextOffset *int
 }
 
+// SandboxFilter selects sandbox instances for cursor-based listing. Every populated field is
+// applied by the service; the SDK does not perform client-side filtering.
+type SandboxFilter struct {
+	// InstanceIDs selects at most 100 exact sandbox identities.
+	InstanceIDs []string
+	// ToolID selects one exact tool identity.
+	ToolID string
+	// States intersects with Metadata. Empty preserves the service default.
+	States []SandboxState
+	// Metadata uses exact values across keys (AND). Multi-value OR is not exposed until the
+	// service behavior is verified for this SDK.
+	Metadata map[string][]string
+}
+
+// SandboxPageOptions selects one cursor-based page. NextToken is opaque and must be passed
+// unchanged with the same filter, MaxResults, and NeedTotalCount values used for the first page.
+type SandboxPageOptions struct {
+	// Filter is applied by the service.
+	Filter SandboxFilter
+	// MaxResults defaults to 20 and must be between 1 and 100 when set.
+	MaxResults int
+	// NextToken is empty for the first request. Tokens expire according to the service contract.
+	NextToken string
+	// NeedTotalCount requests a stable total for this cursor query.
+	NeedTotalCount bool
+}
+
+// SandboxCursorPage is one service cursor page.
+type SandboxCursorPage struct {
+	// Items contains the returned native sandbox descriptions.
+	Items []SandboxInfo
+	// NextToken is returned unchanged. Empty means the query has no further page.
+	NextToken string
+	// TotalCount is nil when it was not requested and points to zero for a known empty query.
+	TotalCount *int64
+}
+
 // SandboxState is the native lifecycle state.
 type SandboxState string
 
@@ -403,4 +440,8 @@ type controlPlane interface {
 	Resume(context.Context, string, ResumeOptions) (SandboxInfo, error)
 	Delete(context.Context, string) error
 	dataPlane(context.Context, string) (dataPlane, error)
+}
+
+type cursorControlPlane interface {
+	ListPage(context.Context, SandboxPageOptions) (SandboxCursorPage, error)
 }

@@ -15,6 +15,9 @@ type (
 	SandboxListOptions = agr.SandboxListOptions
 	SandboxInfo        = agr.SandboxInfo
 	SandboxPage        = agr.SandboxPage
+	SandboxFilter      = agr.SandboxFilter
+	SandboxPageOptions = agr.SandboxPageOptions
+	SandboxCursorPage  = agr.SandboxCursorPage
 	SandboxState       = agr.SandboxState
 	ToolRef            = agr.ToolRef
 	MountOption        = agr.MountOption
@@ -75,4 +78,13 @@ func List(ctx context.Context, opts SandboxListOptions) (SandboxPage, error) {
 		return SandboxPage{}, err
 	}
 	return client.Sandboxes().List(ctx, opts)
+}
+
+// ListPage returns one cursor-based page through the default Client.
+func ListPage(ctx context.Context, opts SandboxPageOptions) (SandboxCursorPage, error) {
+	client, err := resolveDefaultClient()
+	if err != nil {
+		return SandboxCursorPage{}, err
+	}
+	return client.Sandboxes().ListPage(ctx, opts)
 }

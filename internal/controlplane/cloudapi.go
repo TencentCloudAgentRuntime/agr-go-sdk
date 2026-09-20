@@ -80,6 +80,20 @@ type Page struct {
 	Items      []Instance
 	TotalCount int
 }
+type CursorListInput struct {
+	InstanceIDs    []string
+	ToolID         string
+	MaxResults     int
+	NextToken      string
+	NeedTotalCount bool
+	Statuses       []string
+	Metadata       map[string][]string
+}
+type CursorPage struct {
+	Items      []Instance
+	TotalCount int64
+	NextToken  string
+}
 type MonitorInput struct {
 	Namespace, MetricName, InstanceID, ToolID string
 	Period                                    time.Duration
@@ -167,6 +181,37 @@ func (a *AGS) List(ctx context.Context, in ListInput) (Page, error) {
 		return Page{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxInstanceList response is empty")}
 	}
 	out := Page{TotalCount: int(valueInt64(response.Response.TotalCount))}
+	for _, item := range response.Response.InstanceSet {
+		if item != nil {
+			out.Items = append(out.Items, fromInstance(item))
+		}
+	}
+	return out, nil
+}
+
+func (a *AGS) ListPage(ctx context.Context, in CursorListInput) (CursorPage, error) {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return CursorPage{}, err
+	}
+	defer cancel()
+	req := ags.NewDescribeSandboxInstanceListRequest()
+	for _, id := range in.InstanceIDs {
+		id := id
+		req.InstanceIds = append(req.InstanceIds, &id)
+	}
+	req.ToolId = stringPtr(in.ToolID)
+	maxResults := int64(in.MaxResults)
+	req.MaxResults, req.NextToken, req.NeedTotalCount = &maxResults, stringPtr(in.NextToken), &in.NeedTotalCount
+	req.Filters = listFilters(ListInput{Statuses: in.Statuses, Metadata: in.Metadata})
+	response, err := client.DescribeSandboxInstanceListWithContext(callCtx, req)
+	if err != nil {
+		return CursorPage{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil {
+		return CursorPage{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxInstanceList response is empty")}
+	}
+	out := CursorPage{TotalCount: valueInt64(response.Response.TotalCount), NextToken: valueString(response.Response.NextToken)}
 	for _, item := range response.Response.InstanceSet {
 		if item != nil {
 			out.Items = append(out.Items, fromInstance(item))

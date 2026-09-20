@@ -34,13 +34,14 @@ The files under `internal/gen/` are generated from these modified protocol files
 ## Control-plane contract metadata
 
 [`contracts/control-plane.json`](contracts/control-plane.json) is the reviewed SDK Action allowlist
-and its static typed/raw routing decision. The versioned directory
+and its source channel, resource ownership, maturity, and typed routing decision. The versioned directory
 under [`contracts/controlplane/ags/`](contracts/controlplane/ags/) contains a generated effective
 snapshot limited to those Actions and the exact transitive closure of their request and response
 objects. Its manifest records the pinned `ags-cli` repository revision, source `api.json` and
-`api.patch.json` hashes, the compacted `apipatch render` hash, and the local snapshot hash.
-Action and object documents are copied unchanged; only the non-wire `api_brief` is normalized so
-it describes the allowlisted Sandbox scope rather than omitted API-key management Actions.
+`api.patch.json` hashes, effective and local snapshot hashes, source channel, API version, and
+per-Action request/response object closure. Action and object documents are copied unchanged;
+only the non-wire `api_brief` is normalized so it describes the allowlisted SDK scope rather than
+omitted API-key management Actions.
 
 The full CLI schema and its patch are not copied into this repository. `ags-cli` remains the owner
 of patch validation and rendering; the SDK synchronization command invokes that implementation
@@ -52,7 +53,9 @@ from an explicitly supplied checkout.
 closure, field structure, manifest counts, Action routes, and production typed calls. It does not
 claim to re-read the external source files.
 
-Maintainers use `make check-control-contract CLI_DIR=../ags-cli` to compare the committed artifacts
-with the pinned source checkout, or `make sync-control-contract CLI_DIR=../ags-cli` to regenerate
-them after reviewing a source change. `make verify-generate` separately regenerates protocol code
-with pinned tools in a temporary worktree and rejects unexplained drift.
+Maintainers use `make check-control-contract CLI_DIR=../ags-cli CLI_REVISION=<manifest-revision>`
+to compare the committed artifacts with the exact source checkout, or `make sync-control-contract`
+with the same explicit inputs to regenerate them after reviewing a source change. Stable exports
+read the base API directly. Preview exports invoke the CLI's existing patch renderer; this SDK does
+not implement a second patch algorithm. `make verify-generate` separately regenerates protocol
+code with pinned tools in a temporary worktree and rejects unexplained drift.

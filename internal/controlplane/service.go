@@ -93,6 +93,22 @@ type SandboxPage struct {
 	TotalCount int
 }
 
+type CursorListRequest struct {
+	InstanceIDs    []string
+	ToolID         string
+	MaxResults     int
+	NextToken      string
+	NeedTotalCount bool
+	States         []State
+	Metadata       map[string][]string
+}
+
+type SandboxCursorPage struct {
+	Items      []Sandbox
+	TotalCount int64
+	NextToken  string
+}
+
 type MetricRequest struct {
 	Name, InstanceID, ToolID string
 	Start, End               time.Time
@@ -145,6 +161,26 @@ func (s *Service) List(ctx context.Context, request ListRequest) (SandboxPage, e
 		return SandboxPage{}, cloudError(err, "DescribeSandboxInstanceList")
 	}
 	page := SandboxPage{TotalCount: out.TotalCount, Items: make([]Sandbox, 0, len(out.Items))}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, sandboxFrom(item))
+	}
+	return page, nil
+}
+
+func (s *Service) ListPage(ctx context.Context, request CursorListRequest) (SandboxCursorPage, error) {
+	in := CursorListInput{InstanceIDs: request.InstanceIDs, ToolID: request.ToolID, MaxResults: request.MaxResults, NextToken: request.NextToken, NeedTotalCount: request.NeedTotalCount, Metadata: request.Metadata}
+	for _, state := range request.States {
+		if state == StateCreating {
+			in.Statuses = append(in.Statuses, "STARTING")
+		} else {
+			in.Statuses = append(in.Statuses, string(state))
+		}
+	}
+	out, err := s.ags.ListPage(ctx, in)
+	if err != nil {
+		return SandboxCursorPage{}, cloudError(err, "DescribeSandboxInstanceList")
+	}
+	page := SandboxCursorPage{TotalCount: out.TotalCount, NextToken: out.NextToken, Items: make([]Sandbox, 0, len(out.Items))}
 	for _, item := range out.Items {
 		page.Items = append(page.Items, sandboxFrom(item))
 	}

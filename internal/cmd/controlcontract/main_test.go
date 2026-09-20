@@ -87,13 +87,48 @@ func TestReadRoutingRejectsRawRouteMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte(`{"service":"ags","version":"20250920","actions":[{"name":"Action","route":"common_raw"}],"raw_actions":[]}`)
+	data := []byte(`{"service":"ags","version":"20250920","source_channel":"stable","actions":[{"name":"Action","resource":"fixture","maturity":"stable","route":"common_raw"}],"preview_fields":[],"raw_actions":[]}`)
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err := readRouting(root)
 	if err == nil || !strings.Contains(err.Error(), "route and raw_actions disagree") {
 		t.Fatalf("error = %v, want raw route mismatch", err)
+	}
+}
+
+func TestReadRoutingRejectsPreviewActionInStableChannel(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, routingFile)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data := []byte(`{"service":"ags","version":"20250920","source_channel":"stable","actions":[{"name":"Action","resource":"fixture","maturity":"preview","route":"official_typed"}],"preview_fields":[],"raw_actions":[]}`)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := readRouting(root)
+	if err == nil || !strings.Contains(err.Error(), "stable source cannot include preview action") {
+		t.Fatalf("error = %v, want stable/preview channel rejection", err)
+	}
+}
+
+func TestManifestActionsRecordPerActionClosure(t *testing.T) {
+	api := apiContract{
+		Actions: map[string]json.RawMessage{"Action": rawJSON(t, actionShape{Input: "Request", Output: "Response"})},
+		Objects: map[string]json.RawMessage{
+			"Request":  rawJSON(t, objectShape{Members: []memberShape{{Name: "Nested", Type: "object", Member: "Nested"}}}),
+			"Response": rawJSON(t, objectShape{Members: []memberShape{{Name: "RequestId", Type: "string", Member: "string"}}}),
+			"Nested":   rawJSON(t, objectShape{Members: []memberShape{{Name: "Value", Type: "string", Member: "string"}}}),
+		},
+	}
+	routing := routingContract{SourceChannel: "stable", Actions: []actionRoute{{Name: "Action", Resource: "fixture", Maturity: "stable", Route: "official_typed"}}}
+	actions, err := manifestActions(api, routing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(actions) != 1 || actions[0].Request != "Request" || actions[0].Response != "Response" || strings.Join(actions[0].Objects, ",") != "Nested,Request,Response" {
+		t.Fatalf("manifest actions = %#v", actions)
 	}
 }
 

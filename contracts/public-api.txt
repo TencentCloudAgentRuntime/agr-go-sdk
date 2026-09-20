@@ -69,8 +69,16 @@ func NewClient(opts ...ClientOption) (*Client, error)
     Explicit control credentials are read for each signed request so temporary
     credentials can rotate within one logical Cloud identity.
 
+func (c *Client) PreCacheImages() *PreCacheImageManager
+    PreCacheImages returns the image pre-cache service bound to this client's
+    Cloud identity.
+
 func (c *Client) Sandboxes() *SandboxManager
     Sandboxes returns the sandbox control service bound to this client's Cloud
+    identity.
+
+func (c *Client) Tools() *ToolManager
+    Tools returns the sandbox-tool control service bound to this client's Cloud
     identity.
 
 type ClientOption func(*clientConfig)
@@ -437,6 +445,51 @@ func (o CreateOptions) String() string
     String omits options that may contain credentials or sensitive environment
     values.
 
+type CreatePreCacheImageOptions struct {
+	// Image is the image reference.
+	Image string
+	// RegistryType identifies the image registry.
+	RegistryType ImageRegistryType
+}
+    CreatePreCacheImageOptions starts image pre-caching.
+
+type CreateToolOptions struct {
+	// Name is the account-unique Tool name.
+	Name string
+	// Description is optional user-facing text.
+	Description string
+	// DefaultTimeout is a Go-style duration string accepted by the service.
+	DefaultTimeout string
+	// ClientToken is optional Cloud idempotency material.
+	ClientToken string
+	// RoleARN is the role assumed by Tool-created Sandboxes.
+	RoleARN string
+	// Type is the required Tool category.
+	Type ToolType
+	// Network is required and configures Sandbox networking.
+	Network ToolNetworkConfiguration
+	// Tags is the initial tag set.
+	Tags []ToolTag
+	// StorageMounts declares available storage mounts.
+	StorageMounts []ToolStorageMount
+	// CustomConfiguration configures a custom image.
+	CustomConfiguration *ToolCustomConfiguration
+	// ComputerConfiguration configures desktop variants.
+	ComputerConfiguration *ToolComputerConfiguration
+	// LogConfiguration configures log collection.
+	LogConfiguration *ToolLogConfiguration
+	// Persistent preserves omission versus explicit false.
+	Persistent *bool
+}
+    CreateToolOptions contains only fields accepted by CreateSandboxTool.
+
+func (o CreateToolOptions) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (CreateToolOptions) String() string
+    String returns a redacted representation because custom configuration can
+    contain secrets.
+
 type CredentialProvider interface {
 	// Retrieve resolves the Cloud credential pair for a signed request. Honor cancellation;
 	// refreshed values must remain within one tenant.
@@ -477,6 +530,9 @@ type Error struct {
 	// InstanceID is set when creation was accepted but waiting/connecting failed.
 	// The instance may still exist; the SDK never assumes ownership of a replay.
 	InstanceID string
+	// ResourceType and ResourceID identify a non-Sandbox resource involved in the failure.
+	// They are diagnostic evidence and are deliberately omitted from formatted errors.
+	ResourceType, ResourceID string
 	// Mutation is optional evidence for a failed update; nil does not mean NOT_SENT.
 	Mutation *MutationInfo
 }
@@ -485,7 +541,7 @@ type Error struct {
 
 func (e *Error) Error() string
     Error formats the operation, category and diagnostic reason without
-    rendering Cause, InstanceID or a raw response.
+    rendering Cause, InstanceID, ResourceID, or a raw response.
 
 func (e *Error) Is(target error) bool
     Is matches another nonempty SDK error category; it does not compare
@@ -687,6 +743,16 @@ func (f *Files) Write(ctx context.Context, path string, body io.Reader, opts Wri
     closer; arrange for blocked reads to unblock on cancellation. Failure may
     leave partial remote data.
 
+type ImageRegistryType string
+    ImageRegistryType identifies an image registry supported by the stable SDK
+    contract.
+
+const (
+	// ImageRegistryEnterprise selects Tencent Cloud Enterprise TCR.
+	ImageRegistryEnterprise ImageRegistryType = "enterprise"
+	// ImageRegistryPersonal selects Tencent Cloud Personal CCR.
+	ImageRegistryPersonal ImageRegistryType = "personal"
+)
 type MakeDirOptions struct {
 	// User selects the logical runtime account; empty defaults to User.
 	User SandboxUser
@@ -919,6 +985,51 @@ type PauseOptions struct {
 }
     PauseOptions chooses a supported pause mode.
 
+type PreCacheImageInfo struct {
+	// Ref is the complete task identity.
+	Ref PreCacheImageRef
+	// Status is the service task state.
+	Status string
+	// Message is service status text, not a stable machine-readable code.
+	Message string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    PreCacheImageInfo reports image pre-cache task status.
+
+type PreCacheImageManager struct {
+	// Has unexported fields.
+}
+    PreCacheImageManager manages image pre-cache tasks bound to one Client
+    identity.
+
+func (m *PreCacheImageManager) Create(ctx context.Context, opts CreatePreCacheImageOptions) (PreCacheImageResult, error)
+    Create starts pre-caching and returns the complete reference needed by Get.
+
+func (m *PreCacheImageManager) Get(ctx context.Context, ref PreCacheImageRef) (PreCacheImageInfo, error)
+    Get reads pre-cache status using image, digest, and registry type; there is
+    no task ID.
+
+type PreCacheImageRef struct {
+	// Image is the image reference.
+	Image string
+	// Digest is the resolved image digest.
+	Digest string
+	// RegistryType identifies the image registry.
+	RegistryType ImageRegistryType
+}
+    PreCacheImageRef is the complete service identity of an image pre-cache
+    task.
+
+type PreCacheImageResult struct {
+	// Ref is required for subsequent Get calls.
+	Ref PreCacheImageRef
+	// RequestID is service correlation data.
+	RequestID string
+}
+    PreCacheImageResult confirms task creation but does not imply successful
+    pre-caching.
+
 type ProcessInfo struct {
 	// PID is the runtime process identifier in the current Sandbox generation.
 	PID uint32
@@ -1074,6 +1185,31 @@ const (
 	// other configured ports without it.
 	SandboxAuthPublic SandboxAuthMode = "PUBLIC"
 )
+type SandboxCursorPage struct {
+	// Items contains the returned native sandbox descriptions.
+	Items []SandboxInfo
+	// NextToken is returned unchanged. Empty means the query has no further page.
+	NextToken string
+	// TotalCount is nil when it was not requested and points to zero for a known empty query.
+	TotalCount *int64
+}
+    SandboxCursorPage is one service cursor page.
+
+type SandboxFilter struct {
+	// InstanceIDs selects at most 100 exact sandbox identities.
+	InstanceIDs []string
+	// ToolID selects one exact tool identity.
+	ToolID string
+	// States intersects with Metadata. Empty preserves the service default.
+	States []SandboxState
+	// Metadata uses exact values across keys (AND). Multi-value OR is not exposed until the
+	// service behavior is verified for this SDK.
+	Metadata map[string][]string
+}
+    SandboxFilter selects sandbox instances for cursor-based listing.
+    Every populated field is applied by the service; the SDK does not perform
+    client-side filtering.
+
 type SandboxInfo struct {
 	// ID is the sandbox identity; ToolID and ToolName describe the tool when reported.
 	ID, ToolID, ToolName string
@@ -1132,6 +1268,11 @@ func (m *SandboxManager) List(ctx context.Context, opts SandboxListOptions) (San
     List returns one server-filtered Cloud page. Limit defaults to 20.
     Unsupported filters fail explicitly rather than being dropped.
 
+func (m *SandboxManager) ListPage(ctx context.Context, opts SandboxPageOptions) (SandboxCursorPage, error)
+    ListPage returns one cursor-based Cloud page. A nonempty NextToken must be
+    passed unchanged with the same query parameters; the SDK does not parse,
+    restart, or aggregate cursors.
+
 type SandboxMetricName string
     SandboxMetricName identifies one of the ten supported public Cloud Monitor
     metrics.
@@ -1168,6 +1309,20 @@ type SandboxPage struct {
 }
     SandboxPage preserves the service-reported page and total without
     client-side filtering or invented lifecycle states.
+
+type SandboxPageOptions struct {
+	// Filter is applied by the service.
+	Filter SandboxFilter
+	// MaxResults defaults to 20 and must be between 1 and 100 when set.
+	MaxResults int
+	// NextToken is empty for the first request. Tokens expire according to the service contract.
+	NextToken string
+	// NeedTotalCount requests a stable total for this cursor query.
+	NeedTotalCount bool
+}
+    SandboxPageOptions selects one cursor-based page. NextToken is opaque
+    and must be passed unchanged with the same filter, MaxResults, and
+    NeedTotalCount values used for the first page.
 
 type SandboxState string
     SandboxState is the native lifecycle state.
@@ -1275,11 +1430,365 @@ type TemporaryCredentialProvider interface {
     WithCredentialProvider may implement this interface in addition to
     CredentialProvider; two-part providers continue to work.
 
+type ToolAgentBucketStorage struct {
+	// LibraryID is the AgentBucket library identity.
+	LibraryID string
+	// SpaceID is the AgentBucket space identity.
+	SpaceID string
+	// AccessDomain is the AgentBucket access domain.
+	AccessDomain string
+}
+    ToolAgentBucketStorage configures an AgentBucket-backed mount.
+
+type ToolCFSStorage struct {
+	// FileSystemID is the CFS identity.
+	FileSystemID string
+	// Path is the path inside the file system.
+	Path string
+}
+    ToolCFSStorage configures a CFS-backed mount.
+
+type ToolCOSStorage struct {
+	// Endpoint is the COS endpoint.
+	Endpoint string
+	// BucketName is the COS bucket name.
+	BucketName string
+	// BucketPath is the path inside the bucket.
+	BucketPath string
+}
+    ToolCOSStorage configures a COS-backed mount.
+
+type ToolComputerConfiguration struct {
+	// WAAImageID selects a custom WAA image.
+	WAAImageID string
+	// OSWorldVersion selects the built-in OSWorld version.
+	OSWorldVersion string
+}
+    ToolComputerConfiguration configures desktop-environment variants.
+
+type ToolCustomConfiguration struct {
+	// Image is the image reference.
+	Image string
+	// ImageRegistryType identifies the image registry.
+	ImageRegistryType ImageRegistryType
+	// Command overrides the image entrypoint.
+	Command []string
+	// Args supplies image arguments.
+	Args []string
+	// Env supplies image environment variables.
+	Env []ToolEnvironmentVariable
+	// Ports declares exposed ports.
+	Ports []ToolPortConfiguration
+	// Resources supplies optional runtime resources.
+	Resources *ToolResourceConfiguration
+	// Probe supplies optional readiness behavior.
+	Probe *ToolProbeConfiguration
+	// DNS supplies optional DNS behavior.
+	DNS *ToolDNSConfiguration
+}
+    ToolCustomConfiguration configures a custom image.
+
+type ToolCustomConfigurationInfo struct {
+	// ToolCustomConfiguration contains fields accepted by create and update.
+	ToolCustomConfiguration
+	// ImageDigest is the resolved output digest.
+	ImageDigest string
+}
+    ToolCustomConfigurationInfo is the resolved custom-image configuration
+    returned by the service.
+
+type ToolDNSConfiguration struct {
+	// Servers contains DNS server IP addresses.
+	Servers []string
+	// Searches contains DNS search domains.
+	Searches []string
+	// Options contains resolv.conf options.
+	Options []string
+}
+    ToolDNSConfiguration configures image DNS resolution.
+
+type ToolEnvironmentVariable struct {
+	// Name is the environment variable name.
+	Name string
+	// Value is the environment variable value and may be sensitive.
+	Value string
+}
+    ToolEnvironmentVariable is one Tool image environment entry.
+
+type ToolHTTPGetAction struct {
+	// Path is the HTTP path.
+	Path string
+	// Scheme is the HTTP scheme.
+	Scheme string
+	// Port is the probe port.
+	Port int64
+}
+    ToolHTTPGetAction configures an HTTP readiness probe.
+
+type ToolImageStorage struct {
+	// Reference is the image reference.
+	Reference string
+	// ImageRegistryType is the registry type reported by the service.
+	ImageRegistryType string
+	// SubPath is the path inside the image.
+	SubPath string
+	// Digest pins an image digest.
+	Digest string
+}
+    ToolImageStorage configures an image-backed mount.
+
+type ToolInfo struct {
+	// ID is the Tool identity.
+	ID string
+	// Name is the account-unique Tool name.
+	Name string
+	// Description is the user-facing description.
+	Description string
+	// RoleARN is the bound role.
+	RoleARN string
+	// StatusReason explains the current service state when available.
+	StatusReason string
+	// Type is the Tool category.
+	Type ToolType
+	// State is the service state; unrecognized values are preserved.
+	State ToolState
+	// Persistent reports whether the Tool is persistent.
+	Persistent bool
+	// DefaultTimeoutSeconds is the service-normalized default lifetime.
+	DefaultTimeoutSeconds uint64
+	// Network is the current networking configuration.
+	Network ToolNetworkConfiguration
+	// Tags is the current tag set.
+	Tags []ToolTag
+	// CreatedAt is the reported creation time.
+	CreatedAt time.Time
+	// UpdatedAt is the reported update time.
+	UpdatedAt time.Time
+	// StorageMounts is the current mount configuration.
+	StorageMounts []ToolStorageMount
+	// CustomConfiguration is the resolved custom-image configuration.
+	CustomConfiguration *ToolCustomConfigurationInfo
+	// ComputerConfiguration is the current desktop configuration.
+	ComputerConfiguration *ToolComputerConfiguration
+	// LogConfiguration is the current log configuration.
+	LogConfiguration *ToolLogConfiguration
+}
+    ToolInfo is a control-plane Tool description.
+
+type ToolListFilter struct {
+	// Name is the service filter name.
+	Name string
+	// Values are ORed inside this filter.
+	Values []string
+}
+    ToolListFilter is one service-defined exact list filter.
+
+type ToolListOptions struct {
+	// ToolIDs selects at most 100 exact identities.
+	ToolIDs []string
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+	// Filters are ANDed by the service.
+	Filters []ToolListFilter
+}
+    ToolListOptions selects one offset-based Tool page.
+
+type ToolLogConfiguration struct {
+	// CLSTopicID is the destination CLS topic.
+	CLSTopicID string
+	// Files contains service-supported log file paths.
+	Files []string
+}
+    ToolLogConfiguration configures Tool log collection.
+
+type ToolManager struct {
+	// Has unexported fields.
+}
+    ToolManager manages sandbox tool definitions bound to one Client identity.
+
+func (m *ToolManager) Create(ctx context.Context, opts CreateToolOptions) (ToolMutationResult, error)
+    Create submits one Tool mutation. It does not wait for ACTIVE or issue an
+    implicit Get.
+
+func (m *ToolManager) Delete(ctx context.Context, toolID string) error
+    Delete requests Tool deletion. NotFound is idempotent; linked Sandboxes are
+    never deleted.
+
+func (m *ToolManager) Get(ctx context.Context, toolID string) (ToolInfo, error)
+    Get returns the exact Tool identity or NotFound without scanning all pages.
+
+func (m *ToolManager) List(ctx context.Context, opts ToolListOptions) (ToolPage, error)
+    List returns one server-filtered Tool page.
+
+func (m *ToolManager) Update(ctx context.Context, toolID string, opts UpdateToolOptions) (ToolMutationResult, error)
+    Update submits only fields represented by UpdateSandboxTool and does not
+    issue an implicit Get.
+
+func (m *ToolManager) WaitFor(ctx context.Context, toolID string, target ToolState) (ToolInfo, error)
+    WaitFor polls Get until target, a conflicting FAILED state, or context
+    cancellation.
+
+type ToolMutationResult struct {
+	// ToolID identifies the accepted mutation target.
+	ToolID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    ToolMutationResult confirms service acceptance without inventing a Tool
+    snapshot.
+
+type ToolNetworkConfiguration struct {
+	// Mode is required for creation.
+	Mode ToolNetworkMode
+	// VPC contains VPC-specific settings.
+	VPC *ToolVPCConfiguration
+}
+    ToolNetworkConfiguration configures Sandbox networking for one Tool.
+
+type ToolNetworkMode string
+    ToolNetworkMode is the network attachment mode for tool-created sandboxes.
+
+const (
+	// ToolNetworkPublic uses public networking.
+	ToolNetworkPublic ToolNetworkMode = "PUBLIC"
+	// ToolNetworkVPC attaches configured VPC resources.
+	ToolNetworkVPC ToolNetworkMode = "VPC"
+	// ToolNetworkSandbox uses service-managed sandbox networking.
+	ToolNetworkSandbox ToolNetworkMode = "SANDBOX"
+)
+type ToolPage struct {
+	// Items contains Tool descriptions.
+	Items []ToolInfo
+	// TotalCount is the service count for the query.
+	TotalCount int
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+}
+    ToolPage is one service-reported offset page.
+
+type ToolPortConfiguration struct {
+	// Name is the logical port name.
+	Name string
+	// Protocol is the service protocol value.
+	Protocol string
+	// Port is the container port number.
+	Port int64
+}
+    ToolPortConfiguration exposes one image port.
+
+type ToolProbeConfiguration struct {
+	// HTTPGet is the optional HTTP action.
+	HTTPGet *ToolHTTPGetAction
+	// ReadyTimeoutMS bounds total readiness waiting in milliseconds.
+	ReadyTimeoutMS int64
+	// ProbeTimeoutMS bounds one probe in milliseconds.
+	ProbeTimeoutMS int64
+	// ProbePeriodMS is the interval between probes in milliseconds.
+	ProbePeriodMS int64
+	// SuccessThreshold is the required consecutive-success count.
+	SuccessThreshold int64
+	// FailureThreshold is the consecutive-failure count.
+	FailureThreshold int64
+}
+    ToolProbeConfiguration configures image readiness.
+
 type ToolRef struct {
 	// ID and Name are mutually exclusive.
 	ID, Name string
 }
     ToolRef selects exactly one existing sandbox tool.
+
+type ToolResourceConfiguration struct {
+	// CPU is the service CPU quantity string.
+	CPU string
+	// Memory is the service memory quantity string.
+	Memory string
+	// Storage is the optional ephemeral-storage quantity string.
+	Storage string
+}
+    ToolResourceConfiguration requests image runtime resources.
+
+type ToolState string
+    ToolState is the service lifecycle state for a Tool.
+
+const (
+	// ToolCreating means creation is in progress.
+	ToolCreating ToolState = "CREATING"
+	// ToolActive means the Tool is available for Sandbox creation.
+	ToolActive ToolState = "ACTIVE"
+	// ToolDeleting means deletion is in progress.
+	ToolDeleting ToolState = "DELETING"
+	// ToolFailed means provisioning failed.
+	ToolFailed ToolState = "FAILED"
+	// ToolUnknown is an explicit unknown state; unrecognized service values remain intact.
+	ToolUnknown ToolState = "UNKNOWN"
+)
+type ToolStorageMount struct {
+	// Name is the mount configuration name.
+	Name string
+	// MountPath is the instance-local mount path.
+	MountPath string
+	// ReadOnly preserves omitted versus explicit false.
+	ReadOnly *bool
+	// Source is the storage backend; nil preserves the service default.
+	Source *ToolStorageSource
+}
+    ToolStorageMount declares one mount available to Sandboxes created from a
+    Tool.
+
+type ToolStorageSource struct {
+	// COS selects COS storage.
+	COS *ToolCOSStorage
+	// CFS selects CFS storage.
+	CFS *ToolCFSStorage
+	// Image selects image storage.
+	Image *ToolImageStorage
+	// AgentBucket selects AgentBucket storage.
+	AgentBucket *ToolAgentBucketStorage
+}
+    ToolStorageSource selects exactly one storage backend when non-nil.
+
+type ToolTag struct {
+	// Key is the tag key.
+	Key string
+	// Value is the tag value.
+	Value string
+}
+    ToolTag is one Cloud resource tag.
+
+type ToolType string
+    ToolType is the service tool category. The SDK preserves unknown values
+    returned by the service.
+
+const (
+	// ToolBrowser selects the managed browser runtime.
+	ToolBrowser ToolType = "browser"
+	// ToolCodeInterpreter selects the managed code-interpreter runtime.
+	ToolCodeInterpreter ToolType = "code-interpreter"
+	// ToolMobile selects the managed mobile runtime.
+	ToolMobile ToolType = "mobile"
+	// ToolOSWorld selects the OSWorld runtime.
+	ToolOSWorld ToolType = "osworld"
+	// ToolCustom selects a caller-configured image runtime.
+	ToolCustom ToolType = "custom"
+	// ToolSWEbench selects the SWE-bench runtime.
+	ToolSWEbench ToolType = "swebench"
+	// ToolAIO selects the all-in-one runtime.
+	ToolAIO ToolType = "aio"
+	// ToolAndroidWorld selects the AndroidWorld runtime.
+	ToolAndroidWorld ToolType = "android-world"
+	// ToolWAA selects the WAA runtime.
+	ToolWAA ToolType = "waa"
+)
+type ToolVPCConfiguration struct {
+	// SubnetIDs contains subnet identities.
+	SubnetIDs []string
+	// SecurityGroupIDs contains security-group identities.
+	SecurityGroupIDs []string
+}
+    ToolVPCConfiguration identifies VPC attachments.
 
 type UnavailableMetric struct {
 	// Name identifies the failed query.
@@ -1308,6 +1817,21 @@ type UpdateResult struct {
 }
     UpdateResult acknowledges one mutation; it does not imply a trailing
     Describe or independently verified final state.
+
+type UpdateToolOptions struct {
+	// Description preserves omission versus explicit empty text.
+	Description *string
+	// Network replaces the network configuration when non-nil.
+	Network *ToolNetworkConfiguration
+	// Tags replaces tags when non-nil. The current typed transport rejects an empty replacement.
+	Tags *[]ToolTag
+	// CustomConfiguration replaces custom-image settings when non-nil.
+	CustomConfiguration *ToolCustomConfiguration
+	// ComputerConfiguration replaces desktop settings when non-nil.
+	ComputerConfiguration *ToolComputerConfiguration
+}
+    UpdateToolOptions uses pointers to distinguish omission from an explicit
+    empty value.
 
 type WatchHandle struct {
 	// Has unexported fields.
@@ -1413,6 +1937,17 @@ type SandboxAuthMode = agr.SandboxAuthMode
     Public aliases keep the shortcut API compact while preserving one canonical
     resource and model implementation in the root agr package.
 
+type SandboxCursorPage = agr.SandboxCursorPage
+    Public aliases keep the shortcut API compact while preserving one canonical
+    resource and model implementation in the root agr package.
+
+func ListPage(ctx context.Context, opts SandboxPageOptions) (SandboxCursorPage, error)
+    ListPage returns one cursor-based page through the default Client.
+
+type SandboxFilter = agr.SandboxFilter
+    Public aliases keep the shortcut API compact while preserving one canonical
+    resource and model implementation in the root agr package.
+
 type SandboxInfo = agr.SandboxInfo
     Public aliases keep the shortcut API compact while preserving one canonical
     resource and model implementation in the root agr package.
@@ -1431,6 +1966,10 @@ type SandboxPage = agr.SandboxPage
 
 func List(ctx context.Context, opts SandboxListOptions) (SandboxPage, error)
     List returns one server-filtered Cloud page through the default Client.
+
+type SandboxPageOptions = agr.SandboxPageOptions
+    Public aliases keep the shortcut API compact while preserving one canonical
+    resource and model implementation in the root agr package.
 
 type SandboxState = agr.SandboxState
     Public aliases keep the shortcut API compact while preserving one canonical

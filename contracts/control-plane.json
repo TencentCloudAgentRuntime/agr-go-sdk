@@ -1,14 +1,22 @@
 {
   "service": "ags",
   "version": "20250920",
+  "source_channel": "stable",
   "actions": [
-    {"name": "AcquireSandboxInstanceToken", "route": "official_typed"},
-    {"name": "DescribeSandboxInstanceList", "route": "official_typed"},
-    {"name": "PauseSandboxInstance", "route": "official_typed"},
-    {"name": "ResumeSandboxInstance", "route": "official_typed"},
-    {"name": "StartSandboxInstance", "route": "official_typed"},
-    {"name": "StopSandboxInstance", "route": "official_typed"},
-    {"name": "UpdateSandboxInstance", "route": "official_typed"}
+    {"name": "AcquireSandboxInstanceToken", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "CreatePreCacheImageTask", "resource": "pre_cache_image", "maturity": "stable", "route": "official_typed"},
+    {"name": "CreateSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "DeleteSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "DescribePreCacheImageTask", "resource": "pre_cache_image", "maturity": "stable", "route": "official_typed"},
+    {"name": "DescribeSandboxInstanceList", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "DescribeSandboxToolList", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "PauseSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "ResumeSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "StartSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "StopSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "UpdateSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
+    {"name": "UpdateSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"}
   ],
+  "preview_fields": [],
   "raw_actions": []
 }
