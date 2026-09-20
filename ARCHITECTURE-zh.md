@@ -15,12 +15,17 @@ Client
   |                      |-- PTY
   |                      |-- Code
   |                      `-- Metrics
-  `-- 后续通过评审的一级资源服务
+  |-- ToolManager -> ToolInfo / ToolMutationResult
+  `-- PreCacheImageManager -> PreCacheImageInfo
 ```
 
 一个 `Client` 绑定一套腾讯云身份、地域、Endpoint 和请求策略。Create 和 Connect 都返回
 唯一的 `*agr.Sandbox`。`sandbox` 包只是基于环境变量的 Client 快捷入口，不包含另一套
 Sandbox 实现。
+
+Tool 和预热 manager 是账号级纯控制面服务。它们返回的描述、mutation 回执和任务状态是
+SDK 自有的不可变值，不是已连接 handle：没有本地 generation，也不需要 `Close`。mutation
+不会隐式触发 Describe，删除 Tool 也不会级联删除 Sandbox。
 
 `Client` 是 AGR 一级资源的稳定扩展点。新资源只有在具备公开控制面或数据面契约、明确的
 所有权和生命周期、稳定错误、确定性测试、Cookbook 用户旅程及发布文档后才会加入。
@@ -39,7 +44,7 @@ agr / sandbox（公共 facade）
 ```
 
 - 根包负责公共选项、参数校验、稳定错误，以及公共模型和内部 DTO 的转换。
-- `internal/controlplane` 负责 Cloud Client、签名集成、Action 映射、生命周期轮询、
+- `internal/controlplane` 负责 Cloud Client、签名集成、typed Action 映射、生命周期轮询、
   Metrics 请求、实例 Token 获取和新 runtime generation 的构造。
 - `internal/runtime` 负责 generation 有效性、请求生命周期、handle、stream pump、有界队列、
   输出聚合和本地失效。
@@ -77,6 +82,11 @@ PTY、Code execution 和受管理 Code context 都属于创建它们的 generati
 
 公共 API 变化需要先讨论，并审查 API 快照、迁移说明和 Changelog。纯内部重构必须保持
 公共 API 快照不变。
+
+白名单和生成的控制面快照用于证明契约来源，不是第二套公共 API。v2 manifest 记录固定的
+CLI revision 和来源 channel、有效契约哈希，以及各 Action 所属资源、成熟度、route、
+请求/响应类型和引用对象闭包。stable 导出直接读取基础 API；preview 导出委托 CLI 合成
+patch，不在本仓库维护第二套 patch 引擎。
 
 ## 验证
 

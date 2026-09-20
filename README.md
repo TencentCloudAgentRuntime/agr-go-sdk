@@ -4,9 +4,9 @@
 
 The native Go SDK for Tencent Cloud Agent Runtime (AGR). `Client` is the
 product-level entry point for credentials, regions, transport policy, and
-first-class resources. The initial release implements the complete managed
-`Sandbox` journey: lifecycle, streaming files, commands, PTY, file watch, code
-execution contexts, and ten Cloud Monitor metrics.
+first-class resources. The current release provides managed `Sandbox`
+lifecycles and data-plane operations, stable Tool management, and image
+pre-cache tasks.
 
 This is a new Go module, not an in-place release of `ags-go-sdk`. Existing
 users should read [Migrating from ags-go-sdk](MIGRATING_FROM_AGS_GO_SDK.md).
@@ -113,21 +113,37 @@ defer sb.Close()
 The shortcut and explicit Client paths return the same `*agr.Sandbox` type and share the same
 implementation.
 
-`Client` is intentionally broader than Sandbox. Later first-class resources
-such as Volume or Deployment can be exposed as peer services without turning
-`Sandbox` into a universal client. No such service is present until its server
-contract, lifecycle, errors, tests, and cookbook journey are available.
+Tool and pre-cache operations are available only from the explicit Client because they are
+account-level control-plane resources:
+
+```go
+tools, err := client.Tools().List(ctx, agr.ToolListOptions{Limit: 20})
+if err != nil {
+	return err
+}
+
+task, err := client.PreCacheImages().Create(ctx, agr.CreatePreCacheImageOptions{
+	Image:        "ccr.ccs.tencentyun.com/example/runtime:v1",
+	RegistryType: agr.ImageRegistryPersonal,
+})
+```
+
+`Client` is intentionally broader than Sandbox. Additional first-class resources are exposed as
+peer services only after their server contract, lifecycle, errors, tests, and cookbook journey
+are available. This repository does not publish placeholder services.
 
 ## Capabilities
 
 | Area | API |
 | --- | --- |
-| Control | `Create`, `Connect`, `Get`, `List`, `Pause`, `Resume`, `WaitFor`, `Update`, `Delete` |
+| Sandbox control | `Create`, `Connect`, `Get`, offset `List`, cursor `ListPage`, `Pause`, `Resume`, `WaitFor`, `Update`, `Delete` |
 | Files | streaming `Read`/`Write`, `Stat`, `Exists`, `List`, `MakeDir`, `Move`, `Remove`, `Watch` |
 | Commands | `Run`, `Start`, `List`, `Connect`, bounded output, input and signals |
 | Code | `Run`, managed contexts, explicit external context references, bounded callbacks |
 | PTY | start barrier, input, resize, bounded event stream |
 | Metrics | ten typed Cloud Monitor series with `Start`, `End`, period, and partial success |
+| Tools | `Create`, exact `Get`, offset `List`, `Update`, `WaitFor`, idempotent `Delete` |
+| Image pre-cache | `Create` and `Get` by image, digest, and registry type |
 
 ## Lifecycle rules
 
@@ -140,6 +156,13 @@ contract, lifecycle, errors, tests, and cookbook journey are available.
 - Context cancellation stops local observation. It does not prove that a remote mutation or
   process was undone.
 - Mutating operations are not retried automatically.
+- Tool mutation receipts confirm service acceptance; they are not synthesized `ToolInfo`
+  snapshots. `ToolInfo` and pre-cache results are values and do not need `Close`.
+- Tool deletion never cascades to Sandboxes. Delete dependent Sandboxes first and then delete only
+  Tool IDs created by your workflow.
+- Pre-cache creation does not mean the image is ready. Poll `Get` with the returned complete
+  image/digest/registry reference. Stable inputs accept `enterprise` and `personal`; `custom` is
+  intentionally not promised without a verified service contract.
 
 Create and Resume accept whole-second lifetimes from 30 seconds through 24 hours. Update uses
 a 300-second minimum. Connect reads state first: a paused instance follows Resume rules and a
@@ -150,9 +173,9 @@ returned without clamping or an automatic retry.
 ## Errors
 
 Use `errors.As` to inspect `*agr.Error`. Its stable fields include `Code`, `Reason`,
-`Operation`, `RequestID`, `Retryable`, `InstanceID`, and optional mutation evidence. The
-formatted error omits credentials, authorization headers, instance IDs, causes, and response
-bodies.
+`Operation`, `RequestID`, `Retryable`, `InstanceID`, `ResourceType`, `ResourceID`, and optional
+mutation evidence. The formatted error omits credentials, authorization headers, resource IDs,
+causes, and response bodies.
 
 ## Development
 
@@ -163,7 +186,9 @@ make verify
 Default tests are offline. Real Cloud tests require explicit opt-in and are documented in
 [CONTRIBUTING.md](CONTRIBUTING.md). Protocol and control-plane provenance is recorded under
 [`contracts/`](contracts/). The verification suite also compiles the public consumer fixtures
-and rejects imports of removed legacy packages.
+The v2 control-plane manifest pins the CLI revision and source channel, hashes the effective
+contract, and records each Action's resource, maturity, typed route, request/response types, and
+referenced object closure.
 
 See the [Architecture](ARCHITECTURE.md), [Cookbook](examples/cookbook/README.md),
 [Security Policy](SECURITY.md), and [Contributing Guide](CONTRIBUTING.md).

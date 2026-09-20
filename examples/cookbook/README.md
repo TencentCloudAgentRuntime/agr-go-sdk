@@ -9,7 +9,16 @@ running it. All creation examples close local resources and delete only the inst
 | Explicit Client and isolated configuration | [02_explicit_client](02_explicit_client/main.go) | `explicit-client-lifecycle`, `multiple-cloud-identities` |
 | Managed Code context | [03_code_context](03_code_context/main.go) | `code-context` |
 | Metrics with Start and End | [04_metrics](04_metrics/main.go) | `metrics-window` |
+| Opaque cursor pagination | [05_cursor_list](05_cursor_list/main.go) | `cursor-list` |
+| Create Tool, run Sandbox, clean up | [06_tool_sandbox](06_tool_sandbox/main.go) | `tool-sandbox` |
+| Create and observe image pre-cache | [07_pre_cache](07_pre_cache/main.go) | `pre-cache-image` |
 
 The journey IDs are machine-readable in [`contracts/journeys.json`](../../contracts/journeys.json).
 File streaming, Watch, PTY, lifecycle, and cleanup behavior are covered by the root README and
 offline contract tests.
+
+The Tool example creates billable remote resources. It deletes the Sandbox before deleting only
+the Tool identity returned by its own Create call. The pre-cache example expects
+`AGR_PRECACHE_IMAGE` to name an image readable by the current account and
+`AGR_PRECACHE_REGISTRY_TYPE` to be `enterprise` or `personal`. The stable SDK contract does not
+claim support for the service's unverified `custom` registry value.

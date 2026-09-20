@@ -16,13 +16,19 @@ Client
   |                      |-- PTY
   |                      |-- Code
   |                      `-- Metrics
-  `-- future reviewed first-class resource services
+  |-- ToolManager -> ToolInfo / ToolMutationResult
+  `-- PreCacheImageManager -> PreCacheImageInfo
 ```
 
 `Client` binds one Tencent Cloud identity, region, endpoints, and request policy.
 Create and Connect return the canonical `*agr.Sandbox`. The `sandbox` package is a
 small environment-backed convenience layer over the same Client and Sandbox types;
 it does not contain another implementation.
+
+Tool and pre-cache managers are account-level, control-plane-only services. Their returned
+descriptions, mutation receipts, and task status are immutable SDK-owned values rather than
+connected handles: they have no local generation and no `Close`. A mutation never triggers an
+implicit Describe, and deleting a Tool never cascades to Sandboxes.
 
 `Client` is the stable expansion point for AGR resources. A new resource service is
 added only with a public Cloud or data-plane contract, explicit ownership and lifecycle,
@@ -43,7 +49,7 @@ agr / sandbox (public facades)
 
 - The root package owns public options, validation, stable errors, and conversion
   between public values and private DTOs.
-- `internal/controlplane` owns Cloud clients, signing integration, action mapping,
+- `internal/controlplane` owns Cloud clients, signing integration, typed Action mapping,
   lifecycle polling, Metrics requests, instance-token acquisition, and construction
   of a fresh runtime generation.
 - `internal/runtime` owns generation validity, request lifetimes, handles, stream
@@ -91,6 +97,12 @@ separate operations. Moving implementation across layers must not merge those me
 
 Public API changes require prior discussion, an API snapshot review, migration notes,
 and a changelog entry. An internal refactor must keep the public API snapshot unchanged.
+
+The allowlist and generated control-plane snapshot are provenance, not a second public API. The
+v2 manifest records its pinned CLI revision and source channel, effective-contract hashes, and
+each Action's resource, maturity, route, request/response types, and referenced object closure.
+Stable exports read the base API directly; preview exports delegate patch composition to the CLI
+instead of maintaining another patch engine in this repository.
 
 ## Verification
 
