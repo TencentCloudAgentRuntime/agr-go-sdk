@@ -1,7 +1,7 @@
 {
   "service": "ags",
   "version": "20250920",
-  "source_channel": "stable",
+  "channels": ["stable", "preview"],
   "actions": [
     {"name": "AcquireSandboxInstanceToken", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
     {"name": "CreatePreCacheImageTask", "resource": "pre_cache_image", "maturity": "stable", "route": "official_typed"},

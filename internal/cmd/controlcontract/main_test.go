@@ -87,7 +87,7 @@ func TestReadRoutingRejectsRawRouteMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte(`{"service":"ags","version":"20250920","source_channel":"stable","actions":[{"name":"Action","resource":"fixture","maturity":"stable","route":"common_raw"}],"preview_fields":[],"raw_actions":[]}`)
+	data := []byte(`{"service":"ags","version":"20250920","channels":["stable","preview"],"actions":[{"name":"Action","resource":"fixture","maturity":"stable","route":"common_raw"}],"preview_fields":[],"raw_actions":[]}`)
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -97,19 +97,27 @@ func TestReadRoutingRejectsRawRouteMismatch(t *testing.T) {
 	}
 }
 
-func TestReadRoutingRejectsPreviewActionInStableChannel(t *testing.T) {
+func TestRoutingForChannelExcludesPreviewFromStable(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, routingFile)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte(`{"service":"ags","version":"20250920","source_channel":"stable","actions":[{"name":"Action","resource":"fixture","maturity":"preview","route":"official_typed"}],"preview_fields":[],"raw_actions":[]}`)
+	data := []byte(`{"service":"ags","version":"20250920","channels":["stable","preview"],"actions":[{"name":"PreviewAction","resource":"fixture","maturity":"preview","route":"official_typed"},{"name":"StableAction","resource":"fixture","maturity":"stable","route":"official_typed"}],"preview_fields":[{"object":"StableRequest","field":"PreviewValue","maturity":"preview"}],"raw_actions":[]}`)
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := readRouting(root)
-	if err == nil || !strings.Contains(err.Error(), "stable source cannot include preview action") {
-		t.Fatalf("error = %v, want stable/preview channel rejection", err)
+	routing, err := readRouting(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stable := routingForChannel(routing, stableChannel)
+	preview := routingForChannel(routing, previewChannel)
+	if len(stable.Actions) != 1 || stable.Actions[0].Name != "StableAction" || len(stable.PreviewFields) != 0 {
+		t.Fatalf("stable routing = %#v", stable)
+	}
+	if len(preview.Actions) != 2 || len(preview.PreviewFields) != 1 {
+		t.Fatalf("preview routing = %#v", preview)
 	}
 }
 
@@ -122,13 +130,147 @@ func TestManifestActionsRecordPerActionClosure(t *testing.T) {
 			"Nested":   rawJSON(t, objectShape{Members: []memberShape{{Name: "Value", Type: "string", Member: "string"}}}),
 		},
 	}
-	routing := routingContract{SourceChannel: "stable", Actions: []actionRoute{{Name: "Action", Resource: "fixture", Maturity: "stable", Route: "official_typed"}}}
+	routing := routingContract{Channels: []string{stableChannel}, Actions: []actionRoute{{Name: "Action", Resource: "fixture", Maturity: "stable", Route: "official_typed"}}}
 	actions, err := manifestActions(api, routing)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(actions) != 1 || actions[0].Request != "Request" || actions[0].Response != "Response" || strings.Join(actions[0].Objects, ",") != "Nested,Request,Response" {
 		t.Fatalf("manifest actions = %#v", actions)
+	}
+}
+
+func TestValidatePreviewSupersetAcceptsDeclaredFieldAndAction(t *testing.T) {
+	stable := apiContract{
+		Version:  "1.0",
+		Metadata: rawJSON(t, map[string]string{"service": "fixture"}),
+		Actions:  map[string]json.RawMessage{"Stable": rawJSON(t, actionShape{Input: "Request", Output: "Response"})},
+		Objects: map[string]json.RawMessage{
+			"Request":  rawJSON(t, map[string]any{"type": "object", "members": []any{memberShape{Name: "Value", Type: "string", Member: "string"}}}),
+			"Response": rawJSON(t, map[string]any{"type": "object", "members": []any{memberShape{Name: "RequestId", Type: "string", Member: "string"}}}),
+		},
+	}
+	preview := apiContract{
+		Version:  stable.Version,
+		Metadata: stable.Metadata,
+		Actions: map[string]json.RawMessage{
+			"Stable":  stable.Actions["Stable"],
+			"Preview": rawJSON(t, actionShape{Input: "PreviewRequest", Output: "PreviewResponse"}),
+		},
+		Objects: map[string]json.RawMessage{
+			"Request": rawJSON(t, map[string]any{"type": "object", "members": []any{
+				memberShape{Name: "Value", Type: "string", Member: "string"},
+				memberShape{Name: "PreviewValue", Type: "string", Member: "string"},
+			}}),
+			"Response":        stable.Objects["Response"],
+			"PreviewRequest":  rawJSON(t, map[string]any{"type": "object", "members": []any{memberShape{Name: "Input", Type: "string", Member: "string"}}}),
+			"PreviewResponse": rawJSON(t, map[string]any{"type": "object", "members": []any{memberShape{Name: "Output", Type: "string", Member: "string"}}}),
+		},
+	}
+	fields := []fieldMaturity{{Object: "Request", Field: "PreviewValue", Maturity: previewChannel}}
+	if err := validatePreviewSuperset(stable, preview, fields); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidatePreviewSupersetRejectsStableDriftAndUndeclaredField(t *testing.T) {
+	base := func(member memberShape) apiContract {
+		return apiContract{
+			Version:  "1.0",
+			Metadata: rawJSON(t, map[string]string{"service": "fixture"}),
+			Actions:  map[string]json.RawMessage{"Action": rawJSON(t, actionShape{Input: "Request", Output: "Response"})},
+			Objects: map[string]json.RawMessage{
+				"Request":  rawJSON(t, map[string]any{"type": "object", "members": []any{member}}),
+				"Response": rawJSON(t, map[string]any{"type": "object", "members": []any{memberShape{Name: "RequestId", Type: "string", Member: "string"}}}),
+			},
+		}
+	}
+	stable := base(memberShape{Name: "Value", Type: "string", Member: "string"})
+	changed := base(memberShape{Name: "Value", Type: "int", Member: "int"})
+	if err := validatePreviewSuperset(stable, changed, nil); err == nil || !strings.Contains(err.Error(), "changed stable field") {
+		t.Fatalf("changed field error = %v", err)
+	}
+	added := base(memberShape{Name: "Value", Type: "string", Member: "string"})
+	added.Objects["Request"] = rawJSON(t, map[string]any{"type": "object", "members": []any{
+		memberShape{Name: "Value", Type: "string", Member: "string"},
+		memberShape{Name: "Extra", Type: "string", Member: "string"},
+	}})
+	if err := validatePreviewSuperset(stable, added, nil); err == nil || !strings.Contains(err.Error(), "undeclared field") {
+		t.Fatalf("undeclared field error = %v", err)
+	}
+}
+
+func TestFilterPreviewFieldsRequiresExplicitSelection(t *testing.T) {
+	stable := apiContract{Objects: map[string]json.RawMessage{
+		"StorageMount": rawJSON(t, map[string]any{"type": "object", "members": []any{
+			memberShape{Name: "Name", Type: "string", Member: "string"},
+		}}),
+	}}
+	preview := apiContract{Objects: map[string]json.RawMessage{
+		"StorageMount": rawJSON(t, map[string]any{"type": "object", "members": []any{
+			memberShape{Name: "Name", Type: "string", Member: "string"},
+			memberShape{Name: "Volume", Type: "object", Member: "VolumeRef"},
+		}}),
+	}}
+	filtered := preview
+	filtered.Objects = map[string]json.RawMessage{"StorageMount": append(json.RawMessage(nil), preview.Objects["StorageMount"]...)}
+	if err := filterPreviewFields(stable, &filtered, nil); err != nil {
+		t.Fatal(err)
+	}
+	members, err := objectMembersFromContract(filtered.Objects["StorageMount"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(members) != 1 || members[0].Name != "Name" {
+		t.Fatalf("unselected preview field leaked: %#v", members)
+	}
+	selected := preview
+	selected.Objects = map[string]json.RawMessage{"StorageMount": append(json.RawMessage(nil), preview.Objects["StorageMount"]...)}
+	fields := []fieldMaturity{{Object: "StorageMount", Field: "Volume", Maturity: previewChannel}}
+	if err := filterPreviewFields(stable, &selected, fields); err != nil {
+		t.Fatal(err)
+	}
+	members, err = objectMembersFromContract(selected.Objects["StorageMount"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(members) != 2 || members[1].Name != "Volume" {
+		t.Fatalf("selected preview field was removed: %#v", members)
+	}
+}
+
+func objectMembersFromContract(raw json.RawMessage) ([]memberShape, error) {
+	var object objectShape
+	err := json.Unmarshal(raw, &object)
+	return object.Members, err
+}
+
+func TestReleaseChannelSeparatesStableAndPreviewVersions(t *testing.T) {
+	stableRouting := routingContract{Actions: []actionRoute{{Name: "Stable", Maturity: stableChannel}}}
+	if channel, err := releaseChannel("v0.2.0", stableRouting); err != nil || channel != stableChannel {
+		t.Fatalf("stable release = %q, %v", channel, err)
+	}
+	previewRouting := routingContract{Actions: []actionRoute{{Name: "Preview", Maturity: previewChannel}}}
+	if channel, err := releaseChannel("v0.3.0-preview.1", previewRouting); err != nil || channel != previewChannel {
+		t.Fatalf("preview release = %q, %v", channel, err)
+	}
+	if _, err := releaseChannel("v0.3.0", previewRouting); err == nil || !strings.Contains(err.Error(), "stable release") {
+		t.Fatalf("stable accepted preview contract: %v", err)
+	}
+	if _, err := releaseChannel("v0.3.0-preview.1", stableRouting); err == nil || !strings.Contains(err.Error(), "no declared preview") {
+		t.Fatalf("empty preview release accepted: %v", err)
+	}
+}
+
+func TestHasPreviewCapabilitiesUsesActionsAndFields(t *testing.T) {
+	if hasPreviewCapabilities(routingContract{Actions: []actionRoute{{Maturity: stableChannel}}}) {
+		t.Fatal("stable-only registry selected preview")
+	}
+	if !hasPreviewCapabilities(routingContract{Actions: []actionRoute{{Maturity: previewChannel}}}) {
+		t.Fatal("preview action did not select preview")
+	}
+	if !hasPreviewCapabilities(routingContract{PreviewFields: []fieldMaturity{{Object: "Request", Field: "Value", Maturity: previewChannel}}}) {
+		t.Fatal("preview field did not select preview")
 	}
 }
 

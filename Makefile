@@ -2,14 +2,16 @@ BUF ?= buf
 GO ?= go
 GITLEAKS ?= $(shell $(GO) env GOPATH)/bin/gitleaks
 CLI_DIR ?= ../ags-cli
-CLI_REVISION ?= faf0164263075bf957722c70d42ad48b2946ec16
+CLI_REVISION ?= c8ca7d347f667266b44419c62272dcf31fb2febe
+CONTRACT_CHANNEL ?= all
+VERSION ?=
 
 BUF_VERSION := v1.47.2
 PROTOC_GEN_GO_VERSION := v1.36.11
 PROTOC_GEN_CONNECT_GO_VERSION := v1.18.1
 GITLEAKS_VERSION := v8.30.0
 
-.PHONY: all tools generate gen test test-race vet fmt-check sync-control-contract check-control-contract verify-contracts verify-docs verify-api verify-generate verify-consumers verify-e2e-compile verify-secrets verify test-e2e
+.PHONY: all tools generate gen test test-race vet fmt-check sync-control-contract check-control-contract verify-contracts verify-release-channel verify-docs verify-api verify-generate verify-consumers verify-e2e-compile verify-secrets verify test-e2e
 
 all: verify
 
@@ -40,10 +42,15 @@ verify-contracts:
 	GOTOOLCHAIN=local $(GO) test . -run 'Test(ControlPlaneActionRegistryMatchesContract|OfficialControlPlaneCallsStayInsideActionContract|MetricsRegistryMatchesContract|ErrorCodesMatchContract|ProtoHashesMatchContract)'
 
 sync-control-contract:
-	GOTOOLCHAIN=local $(GO) run ./internal/cmd/controlcontract sync --cli-dir "$(CLI_DIR)" --revision "$(CLI_REVISION)"
+	GOTOOLCHAIN=local $(GO) run ./internal/cmd/controlcontract sync --cli-dir "$(CLI_DIR)" --revision "$(CLI_REVISION)" --channel "$(CONTRACT_CHANNEL)"
 
 check-control-contract:
-	GOTOOLCHAIN=local $(GO) run ./internal/cmd/controlcontract sync --cli-dir "$(CLI_DIR)" --revision "$(CLI_REVISION)" --check
+	GOTOOLCHAIN=local $(GO) run ./internal/cmd/controlcontract sync --cli-dir "$(CLI_DIR)" --revision "$(CLI_REVISION)" --channel "$(CONTRACT_CHANNEL)" --check
+
+verify-release-channel:
+	@test -n "$(VERSION)" || { echo "VERSION is required, for example v0.2.0 or v0.3.0-preview.1"; exit 2; }
+	GOTOOLCHAIN=local $(GO) run ./internal/cmd/controlcontract release-check --version "$(VERSION)"
+	@case "$(VERSION)" in *-preview.*) channel=preview ;; *) channel=stable ;; esac; API_CHANNEL="$$channel" GO="$(GO)" bash scripts/verify-api.sh
 
 verify-docs:
 	GOTOOLCHAIN=local $(GO) run ./internal/cmd/verifyrepo

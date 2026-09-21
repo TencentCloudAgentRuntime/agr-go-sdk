@@ -182,7 +182,7 @@ type controlPlaneMember struct {
 
 func readControlPlaneContract(t *testing.T) controlPlaneContract {
 	t.Helper()
-	return readContract[controlPlaneContract](t, "contracts/controlplane/ags/v20250920/effective.json")
+	return readContract[controlPlaneContract](t, "contracts/controlplane/ags/v20250920/stable/effective.json")
 }
 
 func instanceJSON(state string) map[string]any {

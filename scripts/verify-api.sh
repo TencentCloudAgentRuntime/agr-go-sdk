@@ -2,10 +2,19 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-snapshot="$repo_root/contracts/public-api.txt"
 actual="$(mktemp)"
 trap 'rm -f "$actual"' EXIT
 go_cmd="${GO:-go}"
+channel="${API_CHANNEL:-}"
+
+if [[ -z "$channel" ]]; then
+  channel="$(cd "$repo_root" && GOTOOLCHAIN=local "$go_cmd" run ./internal/cmd/controlcontract current-channel)"
+fi
+case "$channel" in
+  stable|preview) ;;
+  *) echo "unsupported API_CHANNEL: $channel" >&2; exit 2 ;;
+esac
+snapshot="$repo_root/contracts/public-api-$channel.txt"
 
 (
   cd "$repo_root"
@@ -14,3 +23,9 @@ go_cmd="${GO:-go}"
 ) >"$actual"
 
 diff -u <(perl -0777 -pe 's/\s+\z/\n/' "$snapshot") <(perl -0777 -pe 's/\s+\z/\n/' "$actual")
+
+if [[ "$channel" == "stable" ]]; then
+  diff -u \
+    <(perl -0777 -pe 's/\s+\z/\n/' "$repo_root/contracts/public-api-stable.txt") \
+    <(perl -0777 -pe 's/\s+\z/\n/' "$repo_root/contracts/public-api-preview.txt")
+fi
