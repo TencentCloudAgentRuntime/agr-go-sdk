@@ -175,6 +175,11 @@ make verify
 v2 控制面 manifest 固定 CLI revision 和来源 channel，记录有效契约哈希，以及各 Action
 所属资源、成熟度、typed route、请求/响应类型和引用对象闭包。
 
+存在 Preview 能力时，通过 `v0.3.0-preview.1` 一类语义化预发布版本交付。module path 和
+公共资源名称保持不变。SDK 不提供运行时 Preview 开关、环境变量切换、请求级 Channel 或
+Go build tag。上方能力表当前均为 stable；Preview 版本只有在契约、公共 API、测试和真实
+服务证据通过评审后才会发布。
+
 实现边界见 [架构说明](ARCHITECTURE-zh.md)，更多示例见
 [Cookbook](examples/cookbook/README.md)。安全问题请按 [安全策略](SECURITY.md) 报告。
 

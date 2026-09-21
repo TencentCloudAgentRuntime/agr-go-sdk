@@ -33,11 +33,11 @@ The files under `internal/gen/` are generated from these modified protocol files
 
 ## Control-plane contract metadata
 
-[`contracts/control-plane.json`](contracts/control-plane.json) is the reviewed SDK Action allowlist
-and its source channel, resource ownership, maturity, and typed routing decision. The versioned directory
-under [`contracts/controlplane/ags/`](contracts/controlplane/ags/) contains a generated effective
-snapshot limited to those Actions and the exact transitive closure of their request and response
-objects. Its manifest records the pinned `ags-cli` repository revision, source `api.json` and
+[`contracts/control-plane.json`](contracts/control-plane.json) is the reviewed SDK Action and
+preview-field allowlist, including resource ownership, maturity, and transport routing. Each
+versioned directory under [`contracts/controlplane/ags/`](contracts/controlplane/ags/) contains
+separate stable and preview snapshots limited to those selections and the exact transitive closure
+of their request and response objects. Each manifest records the pinned `ags-cli` repository revision, source `api.json` and
 `api.patch.json` hashes, effective and local snapshot hashes, source channel, API version, and
 per-Action request/response object closure. Action and object documents are copied unchanged;
 only the non-wire `api_brief` is normalized so it describes the allowlisted SDK scope rather than
@@ -57,5 +57,7 @@ Maintainers use `make check-control-contract CLI_DIR=../ags-cli CLI_REVISION=<ma
 to compare the committed artifacts with the exact source checkout, or `make sync-control-contract`
 with the same explicit inputs to regenerate them after reviewing a source change. Stable exports
 read the base API directly. Preview exports invoke the CLI's existing patch renderer; this SDK does
-not implement a second patch algorithm. `make verify-generate` separately regenerates protocol
+not implement a second patch algorithm. Patched fields on stable objects are excluded unless they
+are explicitly listed in `preview_fields`. Offline verification also proves that the selected
+preview contract preserves the complete stable contract. `make verify-generate` separately regenerates protocol
 code with pinned tools in a temporary worktree and rejects unexplained drift.

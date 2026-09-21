@@ -20,6 +20,8 @@ source-incompatible changes.
 - A migration guide for users of `ags-go-sdk`.
 - Stable Tool create/get/list/update/delete/wait operations and image pre-cache create/get.
 - Cursor-based Sandbox listing with opaque `NextToken` and optional exact total counts.
+- Reproducible stable and preview control-plane snapshots with explicit preview-field selection,
+  stable-superset verification, and semantic-version release-channel checks.
 
 ### Changed
 

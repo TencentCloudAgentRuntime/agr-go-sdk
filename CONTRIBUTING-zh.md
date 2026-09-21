@@ -79,9 +79,9 @@ make verify
 
 ## 控制面契约修改
 
-AGS 控制面的 effective API 来自固定 revision 的 `ags-cli`，并已应用其中的
-`api.patch.json`。本仓库只保存经过评审的 SDK Action 白名单，以及生成的请求/响应对象传递
-闭包。
+AGS 控制面契约来自同一个固定 revision 的 `ags-cli`。stable snapshot 读取基础
+`api.json`；preview snapshot 调用 CLI 自身的 `apipatch render`。本仓库只保存经过评审的
+SDK Action、明确选择的 preview 字段，以及生成的请求/响应对象传递闭包。
 
 准备与 manifest 记录相同 revision 的干净 CLI checkout，然后检查或更新：
 
@@ -91,11 +91,38 @@ make sync-control-contract CLI_DIR=../ags-cli
 make verify-contracts
 ```
 
+可以设置 `CONTRACT_CHANNEL=stable` 或 `preview` 只处理一套 snapshot，默认值为 `all`。
+CLI patch 新增但未被选择的字段不会进入 SDK preview snapshot。只有公共 SDK 映射、测试和
+真实服务证据齐备后，才能把字段加入 `preview_fields`。
+
 `contracts/control-plane.json` 每增加一个 Action 都必须人工评审；同步命令不得
 把 CLI 新发现的 Action 自动加入 SDK。优先使用 `official_typed`。只有 effective API 已包含、
 官方 Go SDK 尚未生成的 Action 才能选择 `common_raw`，并同时列入 `raw_actions`。typed 请求
 发生网络或服务错误后不得 fallback raw，否则 mutation 可能重复提交。不要手工修改生成的
 effective snapshot 或 hash。
+
+## Preview 发布
+
+用户通过 module version 选择 Preview，不通过 Client option、环境变量、请求 Header 或 Go
+build tag 切换。Preview 能力保持根 module path 和公共资源名称不变，在 GoDoc 中标记为
+Experimental，只发布语义化预发布版本，例如 `v0.3.0-preview.1`。
+
+打 tag 前运行以下一项：
+
+```bash
+make verify-release-channel VERSION=v0.2.0
+make verify-release-channel VERSION=v0.3.0-preview.1
+```
+
+已登记 preview Action 或字段时，稳定版本会被拒绝。没有登记任何 preview 能力时，preview
+版本也会被拒绝。Preview 转正前，Action 或字段必须进入 CLI 基础 API；同时需要验证请求
+映射不变，更新 maturity、API snapshot 和发布说明，并完成真实云验证。
+
+registry 没有 preview Action 或字段时，`make verify-api` 检查
+`contracts/public-api-stable.txt`；存在 preview 能力后检查
+`contracts/public-api-preview.txt`。只开发 stable 能力时，两份 snapshot 必须相同。开发
+Preview 时只更新 preview snapshot，保留最近一次评审通过的 stable 基线。
+`verify-release-channel` 会按 tag 选择对应 snapshot。
 
 ## 协议修改
 

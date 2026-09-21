@@ -190,6 +190,12 @@ The v2 control-plane manifest pins the CLI revision and source channel, hashes t
 contract, and records each Action's resource, maturity, typed route, request/response types, and
 referenced object closure.
 
+Preview capabilities, when present, use explicit semantic-version prereleases such as
+`v0.3.0-preview.1`. The module path and public resource names remain unchanged. The SDK has no
+runtime preview switch, environment toggle, request-level channel, or Go build tag. The current
+capability table above is stable; a preview version is published only after its contract, public
+API, tests, and real-service evidence are reviewed.
+
 See the [Architecture](ARCHITECTURE.md), [Cookbook](examples/cookbook/README.md),
 [Security Policy](SECURITY.md), and [Contributing Guide](CONTRIBUTING.md).
 

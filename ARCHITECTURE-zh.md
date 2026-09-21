@@ -83,10 +83,13 @@ PTY、Code execution 和受管理 Code context 都属于创建它们的 generati
 公共 API 变化需要先讨论，并审查 API 快照、迁移说明和 Changelog。纯内部重构必须保持
 公共 API 快照不变。
 
-白名单和生成的控制面快照用于证明契约来源，不是第二套公共 API。v2 manifest 记录固定的
-CLI revision 和来源 channel、有效契约哈希，以及各 Action 所属资源、成熟度、route、
-请求/响应类型和引用对象闭包。stable 导出直接读取基础 API；preview 导出委托 CLI 合成
-patch，不在本仓库维护第二套 patch 引擎。
+白名单和生成的控制面快照用于证明契约来源，不是第二套公共 API。两套 v2 manifest 记录
+固定的 CLI revision、来源 channel、有效契约哈希，以及各 Action 所属资源、成熟度、route、
+请求/响应类型和引用对象闭包。stable 读取基础 API。preview 委托 CLI 合成 patch，过滤未被
+选择的 patch 字段，并且必须保持为 stable 的结构超集。Preview 通过语义化预发布版本交付，
+不使用运行时开关或 Go build tag。
+稳定和 Preview 公共 Go API 分别保存 snapshot。开发阶段由已评审 registry 选择当前源码对应
+的 snapshot；发布阶段按 tag 再选择一次。
 
 ## 验证
 

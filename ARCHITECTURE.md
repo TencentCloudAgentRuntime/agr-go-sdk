@@ -98,11 +98,14 @@ separate operations. Moving implementation across layers must not merge those me
 Public API changes require prior discussion, an API snapshot review, migration notes,
 and a changelog entry. An internal refactor must keep the public API snapshot unchanged.
 
-The allowlist and generated control-plane snapshot are provenance, not a second public API. The
-v2 manifest records its pinned CLI revision and source channel, effective-contract hashes, and
+The allowlist and generated control-plane snapshots are provenance, not a second public API. The
+v2 manifests record their pinned CLI revision and source channel, effective-contract hashes, and
 each Action's resource, maturity, route, request/response types, and referenced object closure.
-Stable exports read the base API directly; preview exports delegate patch composition to the CLI
-instead of maintaining another patch engine in this repository.
+Stable reads the base API directly. Preview delegates patch composition to the CLI, filters out
+unselected patched fields, and must remain a structural superset of stable. Preview is delivered
+through semantic-version prereleases; it is not selected at runtime or with Go build tags.
+Stable and preview public Go API snapshots are stored separately. The reviewed registry selects
+which snapshot represents the current source, while release checks select one from the tag.
 
 ## Verification
 

@@ -15,7 +15,7 @@ Keep every tracked file suitable for a public source repository.
 - The `sandbox` package contains only environment-backed shortcuts that return
   the same `*agr.Sandbox` type as `Client.Sandboxes()`.
 - Do not add placeholder services for Volume, Deployment, Session, Registry,
-  Tool, or another future resource. A resource enters the public API only with
+  or another future resource. A resource enters the public API only with
   a reviewed public service contract, lifecycle and error semantics, a
   cookbook journey, deterministic tests, and release documentation.
 
@@ -38,6 +38,10 @@ line until its consumers migrate.
 
 The SDK is pre-1.0. Public changes still require an API diff, tests, an
 `Unreleased` changelog entry, and migration notes when users must change code.
+Preview capabilities use semantic-version prereleases. Do not add a runtime
+channel option, environment toggle, request header, or Go build tag. Stable
+tags must not contain preview Actions or fields. Preserve the stable public API
+snapshot while developing preview capabilities; update only the preview snapshot.
 
 ## Architecture
 

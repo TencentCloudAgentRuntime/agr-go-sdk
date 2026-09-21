@@ -87,12 +87,13 @@ direction.
 
 ## Control-plane contract changes
 
-The effective AGS control-plane contract comes from a pinned `ags-cli` revision after its
-`api.patch.json` has been applied. This repository stores only the reviewed SDK Action allowlist
-and its generated request/response object closure.
+The AGS control-plane contract comes from one pinned `ags-cli` revision. The stable snapshot reads
+the base `api.json`; the preview snapshot uses the CLI's own `apipatch render` implementation.
+This repository stores only reviewed SDK Actions, explicitly selected preview fields, and their
+generated request/response object closure.
 
 To check or update it, use a clean checkout at the revision recorded in
-`contracts/controlplane/ags/v20250920/MANIFEST.json`:
+`contracts/controlplane/ags/v20250920/{stable,preview}/MANIFEST.json`:
 
 ```bash
 make check-control-contract CLI_DIR=../ags-cli
@@ -100,11 +101,39 @@ make sync-control-contract CLI_DIR=../ags-cli
 make verify-contracts
 ```
 
+Set `CONTRACT_CHANNEL=stable` or `preview` to operate on one snapshot; the default is `all`.
+Unselected fields introduced by the CLI patch are removed from the SDK preview snapshot. Add a
+field to `preview_fields` only with its public SDK mapping, tests, and real-service evidence.
+
 Review every Action addition to `contracts/control-plane.json`; synchronization must
 never add newly discovered CLI Actions automatically. Prefer `official_typed`. Use `common_raw`
 only when the effective public API contains the Action but the official Go SDK does not, and list
 it in `raw_actions`. A typed network or service error must never fall back to raw because that can
 submit a mutation twice. Do not edit the generated effective snapshot or its hashes by hand.
+
+## Preview releases
+
+Preview is selected by module version, not by a Client option, environment variable, request
+header, or Go build tag. A preview capability keeps the root module path and public resource
+names, is marked Experimental in GoDoc, and is released only as a semantic-version prerelease such
+as `v0.3.0-preview.1`.
+
+Before tagging, run one of:
+
+```bash
+make verify-release-channel VERSION=v0.2.0
+make verify-release-channel VERSION=v0.3.0-preview.1
+```
+
+A stable version is rejected while the reviewed registry contains preview Actions or fields. A
+preview version is rejected when it contains no declared preview capability. Preview promotion
+requires the Action or field to exist in the CLI base API, unchanged captured-request behavior,
+an updated maturity, API snapshot review, release notes, and real Cloud validation.
+
+`make verify-api` selects `contracts/public-api-stable.txt` until the registry contains a preview
+Action or field, then selects `contracts/public-api-preview.txt`. Stable-only development keeps
+both snapshots identical. Preview development updates only the preview snapshot and preserves the
+last reviewed stable baseline. `verify-release-channel` checks the snapshot selected by the tag.
 
 ## Protocol changes
 
