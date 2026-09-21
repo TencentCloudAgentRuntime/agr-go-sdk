@@ -96,11 +96,13 @@ func noRedirectClient(client *http.Client) *http.Client {
 // Client binds region, providers, endpoints and HTTP configuration. Construct with NewClient;
 // do not replace its public service pointer concurrently.
 type Client struct {
-	cfg            clientConfig
-	sandboxes      *SandboxManager
-	tools          *ToolManager
-	preCacheImages *PreCacheImageManager
-	deployments    *DeploymentManager
+	cfg             clientConfig
+	sandboxes       *SandboxManager
+	tools           *ToolManager
+	preCacheImages  *PreCacheImageManager
+	deployments     *DeploymentManager
+	volumes         *VolumeManager
+	volumeTemplates *VolumeTemplateManager
 }
 
 // Sandboxes returns the sandbox control service bound to this client's Cloud identity.
@@ -114,6 +116,12 @@ func (c *Client) PreCacheImages() *PreCacheImageManager { return c.preCacheImage
 
 // Deployments returns the Deployment control and data-plane service bound to this client.
 func (c *Client) Deployments() *DeploymentManager { return c.deployments }
+
+// Volumes returns the Preview standalone Volume service.
+func (c *Client) Volumes() *VolumeManager { return c.volumes }
+
+// VolumeTemplates returns the Preview derived-Volume template service.
+func (c *Client) VolumeTemplates() *VolumeTemplateManager { return c.volumeTemplates }
 
 // NewClient constructs a client without creating a sandbox. Region defaults from
 // TENCENTCLOUD_REGION; request timeout defaults to 30 seconds. Explicit control credentials
@@ -155,6 +163,8 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	out.tools = &ToolManager{client: out}
 	out.preCacheImages = &PreCacheImageManager{client: out}
 	out.deployments = &DeploymentManager{client: out}
+	out.volumes = &VolumeManager{client: out}
+	out.volumeTemplates = &VolumeTemplateManager{client: out}
 	return out, nil
 }
 

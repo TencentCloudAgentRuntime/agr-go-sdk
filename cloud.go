@@ -245,6 +245,94 @@ func (c *controlAdapter) DeleteDeployment(ctx context.Context, id string) error 
 	return withResourceError(normalizeError("Deployments.Delete", c.service.DeleteDeployment(ctx, id)), "deployment", id)
 }
 
+func (c *controlAdapter) CreateVolume(ctx context.Context, opts CreateVolumeOptions) (VolumeInfo, error) {
+	out, err := c.service.CreateVolume(ctx, controlCreateVolume(opts))
+	if err != nil {
+		return VolumeInfo{}, normalizeError("Volumes.Create", err)
+	}
+	return volumeInfoFrom(out), nil
+}
+
+func (c *controlAdapter) GetVolume(ctx context.Context, id string) (VolumeInfo, error) {
+	out, err := c.service.GetVolume(ctx, id)
+	if err != nil {
+		return VolumeInfo{}, withResourceError(normalizeError("Volumes.Get", err), "volume", id)
+	}
+	return volumeInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListVolumes(ctx context.Context, opts VolumeListOptions) (VolumePage, error) {
+	out, err := c.service.ListVolumes(ctx, controlVolumeList(opts))
+	if err != nil {
+		return VolumePage{}, normalizeError("Volumes.List", err)
+	}
+	page := VolumePage{TotalCount: out.TotalCount, RequestID: out.RequestID, Items: make([]VolumeInfo, 0, len(out.Items))}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, volumeInfoFrom(controlplane.VolumeResult{Volume: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateVolume(ctx context.Context, id string, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
+	out, err := c.service.UpdateVolume(ctx, id, controlUpdateVolume(opts))
+	if err != nil {
+		return VolumeMutationResult{}, withResourceError(normalizeError("Volumes.Update", err), "volume", id)
+	}
+	return VolumeMutationResult{VolumeID: out.ResourceID, RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) DeleteVolume(ctx context.Context, id string) error {
+	return withResourceError(normalizeError("Volumes.Delete", c.service.DeleteVolume(ctx, id)), "volume", id)
+}
+
+func (c *controlAdapter) CreateVolumeTemplate(ctx context.Context, opts CreateVolumeTemplateOptions) (VolumeTemplateInfo, error) {
+	out, err := c.service.CreateVolumeTemplate(ctx, controlCreateVolumeTemplate(opts))
+	if err != nil {
+		return VolumeTemplateInfo{}, normalizeError("VolumeTemplates.Create", err)
+	}
+	return volumeTemplateInfoFrom(out), nil
+}
+
+func (c *controlAdapter) GetVolumeTemplate(ctx context.Context, id string) (VolumeTemplateInfo, error) {
+	out, err := c.service.GetVolumeTemplate(ctx, id)
+	if err != nil {
+		return VolumeTemplateInfo{}, withResourceError(normalizeError("VolumeTemplates.Get", err), "volume_template", id)
+	}
+	return volumeTemplateInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListVolumeTemplates(ctx context.Context, opts VolumeTemplateListOptions) (VolumeTemplatePage, error) {
+	out, err := c.service.ListVolumeTemplates(ctx, controlVolumeTemplateList(opts))
+	if err != nil {
+		return VolumeTemplatePage{}, normalizeError("VolumeTemplates.List", err)
+	}
+	page := VolumeTemplatePage{TotalCount: out.TotalCount, RequestID: out.RequestID, Items: make([]VolumeTemplateInfo, 0, len(out.Items))}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, volumeTemplateInfoFrom(controlplane.VolumeTemplateResult{Template: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateVolumeTemplate(ctx context.Context, id string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
+	out, err := c.service.UpdateVolumeTemplate(ctx, id, controlUpdateVolumeTemplate(opts))
+	if err != nil {
+		return VolumeTemplateMutationResult{}, withResourceError(normalizeError("VolumeTemplates.Update", err), "volume_template", id)
+	}
+	return VolumeTemplateMutationResult{VolumeTemplateID: out.ResourceID, RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) DeleteVolumeTemplate(ctx context.Context, id string) error {
+	return withResourceError(normalizeError("VolumeTemplates.Delete", c.service.DeleteVolumeTemplate(ctx, id)), "volume_template", id)
+}
+
 func (c *controlAdapter) acquireDeploymentToken(ctx context.Context, id string) (deploymentAccess, error) {
 	out, err := c.service.AcquireDeploymentToken(ctx, id)
 	if err != nil {
@@ -302,6 +390,110 @@ func deploymentInfoFrom(value controlplane.DeploymentResult) DeploymentInfo {
 	}
 	for _, tag := range in.Tags {
 		out.Tags = append(out.Tags, DeploymentTag{Key: tag.Key, Value: tag.Value})
+	}
+	return out
+}
+
+func controlVolumeTags(values []VolumeTag) []controlplane.VolumeTag {
+	out := make([]controlplane.VolumeTag, 0, len(values))
+	for _, value := range values {
+		out = append(out, controlplane.VolumeTag{Key: value.Key, Value: value.Value})
+	}
+	return out
+}
+
+func controlVolumeStorage(value VolumeStorage) controlplane.VolumeStorage {
+	out := controlplane.VolumeStorage{}
+	if value.COS != nil {
+		out.COS = &controlplane.VolumeCOS{Endpoint: value.COS.Endpoint, BucketName: value.COS.BucketName, BucketPath: value.COS.BucketPath}
+	}
+	if value.CFS != nil {
+		out.CFS = &controlplane.VolumeCFS{FileSystemID: value.CFS.FileSystemID, Path: value.CFS.Path}
+	}
+	return out
+}
+
+func controlVolumeTemplateStorage(value VolumeTemplateStorage) controlplane.VolumeStorageSpec {
+	out := controlplane.VolumeStorageSpec{}
+	if value.COS != nil {
+		out.COS = &controlplane.VolumeCOSSpec{Endpoint: value.COS.Endpoint, BucketName: value.COS.BucketName, BucketPathPattern: value.COS.BucketPathPattern}
+	}
+	if value.CFS != nil {
+		out.CFS = &controlplane.VolumeCFSSpec{FileSystemID: value.CFS.FileSystemID, PathPattern: value.CFS.PathPattern}
+	}
+	return out
+}
+
+func controlCreateVolume(value CreateVolumeOptions) controlplane.CreateVolumeRequest {
+	return controlplane.CreateVolumeRequest{Name: value.Name, AccessMode: string(value.AccessMode), StorageType: string(value.StorageType), Storage: controlVolumeStorage(value.Storage), Tags: controlVolumeTags(value.Tags), ClientToken: value.ClientToken, StorageRoleARN: value.StorageRoleARN}
+}
+
+func controlCreateVolumeTemplate(value CreateVolumeTemplateOptions) controlplane.CreateVolumeTemplateRequest {
+	return controlplane.CreateVolumeTemplateRequest{Name: value.Name, AccessMode: string(value.AccessMode), ReclaimPolicy: string(value.ReclaimPolicy), StorageType: string(value.StorageType), StorageSpec: controlVolumeTemplateStorage(value.Storage), VolumeNamePattern: value.VolumeNamePattern, DefaultCapacity: value.DefaultCapacity, StorageRoleARN: value.StorageRoleARN, Tags: controlVolumeTags(value.Tags), ClientToken: value.ClientToken}
+}
+
+func controlVolumeList(value VolumeListOptions) controlplane.VolumeListRequest {
+	out := controlplane.VolumeListRequest{IDs: value.IDs, Names: value.Names, Offset: value.Offset, Limit: value.Limit}
+	for _, filter := range value.Filters {
+		out.Filters = append(out.Filters, controlplane.VolumeFilter{Name: filter.Name, Values: filter.Values})
+	}
+	return out
+}
+
+func controlVolumeTemplateList(value VolumeTemplateListOptions) controlplane.VolumeListRequest {
+	return controlVolumeList(VolumeListOptions{IDs: value.IDs, Names: value.Names, Filters: value.Filters, Offset: value.Offset, Limit: value.Limit})
+}
+
+func controlUpdateVolume(value UpdateVolumeOptions) controlplane.UpdateVolumeRequest {
+	out := controlplane.UpdateVolumeRequest{}
+	if value.Tags != nil {
+		tags := controlVolumeTags(*value.Tags)
+		out.Tags = &tags
+	}
+	return out
+}
+
+func controlUpdateVolumeTemplate(value UpdateVolumeTemplateOptions) controlplane.UpdateVolumeTemplateRequest {
+	out := controlplane.UpdateVolumeTemplateRequest{DefaultCapacity: value.DefaultCapacity}
+	if value.Tags != nil {
+		tags := controlVolumeTags(*value.Tags)
+		out.Tags = &tags
+	}
+	return out
+}
+
+func volumeInfoFrom(value controlplane.VolumeResult) VolumeInfo {
+	in := value.Volume
+	out := VolumeInfo{ID: in.ID, Name: in.Name, AccessMode: VolumeAccessMode(in.AccessMode), ReclaimPolicy: VolumeReclaimPolicy(in.ReclaimPolicy), State: VolumeState(in.State), StorageType: VolumeStorageType(in.StorageType), TemplateID: in.TemplateID, ReuseKey: in.ReuseKey, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt, StorageRoleARN: in.StorageRoleARN, MountedInstanceID: in.MountedInstanceID, RequestID: value.RequestID}
+	out.Storage = volumeStorageFromControl(in.Storage)
+	for _, tag := range in.Tags {
+		out.Tags = append(out.Tags, VolumeTag{Key: tag.Key, Value: tag.Value})
+	}
+	return out
+}
+
+func volumeStorageFromControl(value controlplane.VolumeStorage) VolumeStorage {
+	out := VolumeStorage{}
+	if value.COS != nil {
+		out.COS = &VolumeCOSStorage{Endpoint: value.COS.Endpoint, BucketName: value.COS.BucketName, BucketPath: value.COS.BucketPath}
+	}
+	if value.CFS != nil {
+		out.CFS = &VolumeCFSStorage{FileSystemID: value.CFS.FileSystemID, Path: value.CFS.Path}
+	}
+	return out
+}
+
+func volumeTemplateInfoFrom(value controlplane.VolumeTemplateResult) VolumeTemplateInfo {
+	in := value.Template
+	out := VolumeTemplateInfo{ID: in.ID, Name: in.Name, AccessMode: VolumeAccessMode(in.AccessMode), ReclaimPolicy: VolumeReclaimPolicy(in.ReclaimPolicy), State: VolumeState(in.State), StorageType: VolumeStorageType(in.StorageType), VolumeNamePattern: in.VolumeNamePattern, DefaultCapacity: in.DefaultCapacity, StorageRoleARN: in.StorageRoleARN, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt, RequestID: value.RequestID}
+	if in.StorageSpec.COS != nil {
+		out.Storage.COS = &VolumeTemplateCOSStorage{Endpoint: in.StorageSpec.COS.Endpoint, BucketName: in.StorageSpec.COS.BucketName, BucketPathPattern: in.StorageSpec.COS.BucketPathPattern}
+	}
+	if in.StorageSpec.CFS != nil {
+		out.Storage.CFS = &VolumeTemplateCFSStorage{FileSystemID: in.StorageSpec.CFS.FileSystemID, PathPattern: in.StorageSpec.CFS.PathPattern}
+	}
+	for _, tag := range in.Tags {
+		out.Tags = append(out.Tags, VolumeTag{Key: tag.Key, Value: tag.Value})
 	}
 	return out
 }
@@ -396,6 +588,12 @@ func controlToolMounts(values []ToolStorageMount) []controlplane.ToolStorageMoun
 			}
 			item.Source = source
 		}
+		if v.Volume != nil {
+			item.Volume = &controlplane.ToolVolumeRef{ID: v.Volume.ID, Name: v.Volume.Name}
+		}
+		if v.VolumeTemplate != nil {
+			item.VolumeTemplate = &controlplane.ToolVolumeTemplateRef{Name: v.VolumeTemplate.Name, ReuseKey: v.VolumeTemplate.ReuseKey}
+		}
 		out = append(out, item)
 	}
 	return out
@@ -476,6 +674,12 @@ func toolMountsFrom(values []controlplane.ToolStorageMount) []ToolStorageMount {
 				source.AgentBucket = &ToolAgentBucketStorage{LibraryID: v.Source.AgentBucket.LibraryID, SpaceID: v.Source.AgentBucket.SpaceID, AccessDomain: v.Source.AgentBucket.AccessDomain}
 			}
 			item.Source = source
+		}
+		if v.Volume != nil {
+			item.Volume = &ToolVolumeRef{ID: v.Volume.ID, Name: v.Volume.Name}
+		}
+		if v.VolumeTemplate != nil {
+			item.VolumeTemplate = &ToolVolumeTemplateRef{Name: v.VolumeTemplate.Name, ReuseKey: v.VolumeTemplate.ReuseKey}
 		}
 		out = append(out, item)
 	}

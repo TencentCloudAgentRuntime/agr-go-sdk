@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -56,10 +57,14 @@ type ToolStorageSource struct {
 	Image       *ToolImage
 	AgentBucket *ToolAgentBucket
 }
+type ToolVolumeRef struct{ ID, Name string }
+type ToolVolumeTemplateRef struct{ Name, ReuseKey string }
 type ToolStorageMount struct {
 	Name, MountPath string
 	ReadOnly        *bool
 	Source          *ToolStorageSource
+	Volume          *ToolVolumeRef
+	VolumeTemplate  *ToolVolumeTemplateRef
 }
 
 type CreateToolRequest struct {
@@ -124,11 +129,19 @@ type wireTool struct {
 }
 
 func (s *Service) CreateTool(ctx context.Context, request CreateToolRequest) (ToolMutation, error) {
-	out, err := s.ags.CreateTool(ctx, request)
+	var (
+		out ToolMutation
+		err error
+	)
+	if hasPreviewToolMounts(request.StorageMounts) {
+		out, err = s.ags.CreateToolPreview(ctx, request)
+	} else {
+		out, err = s.ags.CreateTool(ctx, request)
+	}
 	return out, cloudError(err, "CreateSandboxTool")
 }
 func (s *Service) GetTool(ctx context.Context, id string) (Tool, error) {
-	out, err := s.ags.ListTools(ctx, ToolListRequest{ToolIDs: []string{id}, Limit: 1})
+	out, err := s.ags.ListToolsPreview(ctx, ToolListRequest{ToolIDs: []string{id}, Limit: 1})
 	if err != nil {
 		return Tool{}, cloudError(err, "DescribeSandboxToolList")
 	}
@@ -138,7 +151,7 @@ func (s *Service) GetTool(ctx context.Context, id string) (Tool, error) {
 	return toolFromWire(out.Items[0]), nil
 }
 func (s *Service) ListTools(ctx context.Context, request ToolListRequest) (ToolPage, error) {
-	out, err := s.ags.ListTools(ctx, request)
+	out, err := s.ags.ListToolsPreview(ctx, request)
 	if err != nil {
 		return ToolPage{}, cloudError(err, "DescribeSandboxToolList")
 	}
@@ -176,6 +189,60 @@ func (a *AGS) CreateTool(ctx context.Context, in CreateToolRequest) (ToolMutatio
 		return ToolMutation{}, err
 	}
 	defer cancel()
+	req := newCreateToolRequest(in)
+	response, err := client.CreateSandboxToolWithContext(callCtx, req)
+	if err != nil {
+		return ToolMutation{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil || response.Response.ToolId == nil {
+		return ToolMutation{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("CreateSandboxTool response is missing required fields")}
+	}
+	return ToolMutation{ToolID: valueString(response.Response.ToolId), RequestID: valueString(response.Response.RequestId)}, nil
+}
+
+func (a *AGS) CreateToolPreview(ctx context.Context, in CreateToolRequest) (ToolMutation, error) {
+	req := newCreateToolRequest(in)
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(req.ToJsonString()), &payload); err != nil {
+		return ToolMutation{}, &Error{Code: "ClientError.InvalidRequest", Cause: errors.New("encode CreateSandboxTool Preview request")}
+	}
+	mounts, _ := payload["StorageMounts"].([]any)
+	for index, value := range in.StorageMounts {
+		if index >= len(mounts) {
+			return ToolMutation{}, &Error{Code: "ClientError.InvalidRequest", Cause: errors.New("encode CreateSandboxTool Preview mounts")}
+		}
+		mount, ok := mounts[index].(map[string]any)
+		if !ok {
+			return ToolMutation{}, &Error{Code: "ClientError.InvalidRequest", Cause: errors.New("encode CreateSandboxTool Preview mount")}
+		}
+		if value.Volume != nil {
+			ref := map[string]any{}
+			if value.Volume.ID != "" {
+				ref["VolumeId"] = value.Volume.ID
+			}
+			if value.Volume.Name != "" {
+				ref["VolumeName"] = value.Volume.Name
+			}
+			mount["Volume"] = ref
+		}
+		if value.VolumeTemplate != nil {
+			mount["VolumeTemplate"] = map[string]any{"VolumeTemplateName": value.VolumeTemplate.Name, "ReuseKey": value.VolumeTemplate.ReuseKey}
+		}
+	}
+	var response struct {
+		ToolID    *string `json:"ToolId"`
+		RequestID *string `json:"RequestId"`
+	}
+	if err := a.commonPreviewFieldCall(ctx, "CreateSandboxTool", payload, &response); err != nil {
+		return ToolMutation{}, err
+	}
+	if response.ToolID == nil || *response.ToolID == "" || response.RequestID == nil || *response.RequestID == "" {
+		return ToolMutation{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("CreateSandboxTool Preview response is missing required fields")}
+	}
+	return ToolMutation{ToolID: *response.ToolID, RequestID: valueString(response.RequestID)}, nil
+}
+
+func newCreateToolRequest(in CreateToolRequest) *ags.CreateSandboxToolRequest {
 	req := ags.NewCreateSandboxToolRequest()
 	req.ToolName, req.ToolType = stringPtr(in.Name), stringPtr(in.Type)
 	req.NetworkConfiguration = toNetwork(in.Network)
@@ -183,14 +250,16 @@ func (a *AGS) CreateTool(ctx context.Context, in CreateToolRequest) (ToolMutatio
 	req.Tags, req.StorageMounts = toTags(in.Tags), toStorageMounts(in.StorageMounts)
 	req.CustomConfiguration, req.ComputerConfiguration, req.LogConfiguration = toCustom(in.Custom), toComputer(in.Computer), toLog(in.Log)
 	req.Persistent = in.Persistent
-	response, err := client.CreateSandboxToolWithContext(callCtx, req)
-	if err != nil {
-		return ToolMutation{}, wrapCall(callCtx, err)
+	return req
+}
+
+func hasPreviewToolMounts(values []ToolStorageMount) bool {
+	for _, value := range values {
+		if value.Volume != nil || value.VolumeTemplate != nil {
+			return true
+		}
 	}
-	if response == nil || response.Response == nil || response.Response.ToolId == nil {
-		return ToolMutation{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("CreateSandboxTool response has no ToolId")}
-	}
-	return ToolMutation{ToolID: valueString(response.Response.ToolId), RequestID: valueString(response.Response.RequestId)}, nil
+	return false
 }
 
 func (a *AGS) ListTools(ctx context.Context, in ToolListRequest) (struct {
@@ -244,6 +313,120 @@ func (a *AGS) ListTools(ctx context.Context, in ToolListRequest) (struct {
 		}
 	}
 	return out, nil
+}
+
+func (a *AGS) ListToolsPreview(ctx context.Context, in ToolListRequest) (struct {
+	Items      []wireTool
+	TotalCount int
+}, error) {
+	req := newListToolsRequest(in)
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(req.ToJsonString()), &payload); err != nil {
+		return struct {
+			Items      []wireTool
+			TotalCount int
+		}{}, &Error{Code: "ClientError.InvalidRequest", Cause: errors.New("encode DescribeSandboxToolList Preview request")}
+	}
+	var response struct {
+		Items      json.RawMessage `json:"SandboxToolSet"`
+		TotalCount *int64          `json:"TotalCount"`
+		RequestID  *string         `json:"RequestId"`
+	}
+	if err := a.commonPreviewFieldCall(ctx, "DescribeSandboxToolList", payload, &response); err != nil {
+		return struct {
+			Items      []wireTool
+			TotalCount int
+		}{}, err
+	}
+	if response.TotalCount == nil || *response.TotalCount < 0 || response.RequestID == nil || *response.RequestID == "" {
+		return struct {
+			Items      []wireTool
+			TotalCount int
+		}{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxToolList response is malformed")}
+	}
+	var items []json.RawMessage
+	// The service historically encodes an empty Tool collection as null. Accept
+	// that representation only when TotalCount proves the page is empty.
+	if string(response.Items) == "null" && *response.TotalCount == 0 {
+		items = []json.RawMessage{}
+	} else if invalidCollection(response.Items) || json.Unmarshal(response.Items, &items) != nil {
+		return struct {
+			Items      []wireTool
+			TotalCount int
+		}{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxToolList response collection is malformed")}
+	}
+	out := struct {
+		Items      []wireTool
+		TotalCount int
+	}{TotalCount: int(*response.TotalCount), Items: make([]wireTool, 0, len(items))}
+	for _, raw := range items {
+		var value ags.SandboxTool
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return struct {
+				Items      []wireTool
+				TotalCount int
+			}{}, &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxToolList Tool is malformed")}
+		}
+		tool := fromTool(&value)
+		if err := overlayPreviewToolMounts(raw, &tool); err != nil {
+			return struct {
+				Items      []wireTool
+				TotalCount int
+			}{}, err
+		}
+		out.Items = append(out.Items, tool)
+	}
+	return out, nil
+}
+
+func newListToolsRequest(in ToolListRequest) *ags.DescribeSandboxToolListRequest {
+	req := ags.NewDescribeSandboxToolListRequest()
+	for _, id := range in.ToolIDs {
+		id := id
+		req.ToolIds = append(req.ToolIds, &id)
+	}
+	offset, limit := int64(in.Offset), int64(in.Limit)
+	req.Offset, req.Limit = &offset, &limit
+	for _, filter := range in.Filters {
+		name := filter.Name
+		item := &ags.Filter{Name: &name}
+		for _, value := range filter.Values {
+			value := value
+			item.Values = append(item.Values, &value)
+		}
+		req.Filters = append(req.Filters, item)
+	}
+	return req
+}
+
+func overlayPreviewToolMounts(raw json.RawMessage, tool *wireTool) error {
+	var preview struct {
+		StorageMounts []struct {
+			Volume *struct {
+				ID   string `json:"VolumeId"`
+				Name string `json:"VolumeName"`
+			} `json:"Volume"`
+			VolumeTemplate *struct {
+				Name     string `json:"VolumeTemplateName"`
+				ReuseKey string `json:"ReuseKey"`
+			} `json:"VolumeTemplate"`
+		} `json:"StorageMounts"`
+	}
+	if err := json.Unmarshal(raw, &preview); err != nil {
+		return &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxToolList StorageMounts are malformed")}
+	}
+	if len(preview.StorageMounts) != len(tool.StorageMounts) {
+		return &Error{Code: "ClientError.MalformedResponse", Cause: errors.New("DescribeSandboxToolList StorageMounts are inconsistent")}
+	}
+	for index, mount := range preview.StorageMounts {
+		if mount.Volume != nil {
+			tool.StorageMounts[index].Volume = &ToolVolumeRef{ID: mount.Volume.ID, Name: mount.Volume.Name}
+		}
+		if mount.VolumeTemplate != nil {
+			tool.StorageMounts[index].VolumeTemplate = &ToolVolumeTemplateRef{Name: mount.VolumeTemplate.Name, ReuseKey: mount.VolumeTemplate.ReuseKey}
+		}
+	}
+	return nil
 }
 
 func (a *AGS) UpdateTool(ctx context.Context, id string, in UpdateToolRequest) (ToolMutation, error) {

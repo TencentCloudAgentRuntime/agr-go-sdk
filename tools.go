@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -262,6 +263,22 @@ type ToolStorageSource struct {
 	AgentBucket *ToolAgentBucketStorage
 }
 
+// ToolVolumeRef selects one existing Preview Volume by exactly one identity.
+type ToolVolumeRef struct {
+	// ID is the stable Volume identity.
+	ID string
+	// Name is the account-local Volume name.
+	Name string
+}
+
+// ToolVolumeTemplateRef derives or reuses a Volume from a Preview template.
+type ToolVolumeTemplateRef struct {
+	// Name is the VolumeTemplate name.
+	Name string
+	// ReuseKey may be a literal or an unmodified ${metadata.<key>} expression.
+	ReuseKey string
+}
+
 // ToolStorageMount declares one mount available to Sandboxes created from a Tool.
 type ToolStorageMount struct {
 	// Name is the mount configuration name.
@@ -272,6 +289,10 @@ type ToolStorageMount struct {
 	ReadOnly *bool
 	// Source is the storage backend; nil preserves the service default.
 	Source *ToolStorageSource
+	// Volume mounts one existing Preview Volume. It is mutually exclusive with Source and VolumeTemplate.
+	Volume *ToolVolumeRef
+	// VolumeTemplate derives or reuses a Preview Volume. It is mutually exclusive with Source and Volume.
+	VolumeTemplate *ToolVolumeTemplateRef
 }
 
 // CreateToolOptions contains only fields accepted by CreateSandboxTool.
@@ -685,24 +706,44 @@ func validateToolMounts(values []ToolStorageMount, operation string) error {
 		if mount.Name == "" {
 			return codeError(InvalidArgument, operation, "STORAGE_MOUNT_NAME_REQUIRED")
 		}
-		if mount.Source == nil {
-			continue
+		sourceCount := 0
+		if mount.Source != nil {
+			sourceCount++
 		}
-		count := 0
-		if mount.Source.COS != nil {
-			count++
+		if mount.Volume != nil {
+			sourceCount++
 		}
-		if mount.Source.CFS != nil {
-			count++
+		if mount.VolumeTemplate != nil {
+			sourceCount++
 		}
-		if mount.Source.Image != nil {
-			count++
+		if sourceCount > 1 {
+			return codeError(InvalidArgument, operation, "STORAGE_MOUNT_SOURCE_CONFLICT")
 		}
-		if mount.Source.AgentBucket != nil {
-			count++
+		if mount.Source != nil {
+			count := 0
+			if mount.Source.COS != nil {
+				count++
+			}
+			if mount.Source.CFS != nil {
+				count++
+			}
+			if mount.Source.Image != nil {
+				count++
+			}
+			if mount.Source.AgentBucket != nil {
+				count++
+			}
+			if count != 1 {
+				return codeError(InvalidArgument, operation, "STORAGE_SOURCE_INVALID")
+			}
 		}
-		if count != 1 {
-			return codeError(InvalidArgument, operation, "STORAGE_SOURCE_INVALID")
+		if mount.Volume != nil {
+			if (mount.Volume.ID == "") == (mount.Volume.Name == "") {
+				return codeError(InvalidArgument, operation, "VOLUME_REF_INVALID")
+			}
+		}
+		if mount.VolumeTemplate != nil && (mount.VolumeTemplate.Name == "" || mount.VolumeTemplate.ReuseKey == "") {
+			return codeError(InvalidArgument, operation, "VOLUME_TEMPLATE_REF_INVALID")
 		}
 	}
 	return nil
@@ -827,6 +868,14 @@ func copyToolMounts(values []ToolStorageMount) []ToolStorageMount {
 			}
 			out[i].Source = &source
 		}
+		if out[i].Volume != nil {
+			volume := *out[i].Volume
+			out[i].Volume = &volume
+		}
+		if out[i].VolumeTemplate != nil {
+			template := *out[i].VolumeTemplate
+			out[i].VolumeTemplate = &template
+		}
 	}
 	return out
 }
@@ -839,4 +888,715 @@ func withResourceError(err error, resourceType, resourceID string) error {
 		return &copied
 	}
 	return err
+}
+
+// VolumeAccessMode controls how many Sandbox instances may mount a Volume and
+// whether those mounts are writable.
+type VolumeAccessMode string
+
+const (
+	// VolumeReadWriteOnce allows one writable mount.
+	VolumeReadWriteOnce VolumeAccessMode = "ReadWriteOnce"
+	// VolumeReadWriteMany allows multiple writable mounts.
+	VolumeReadWriteMany VolumeAccessMode = "ReadWriteMany"
+	// VolumeReadOnlyMany allows multiple read-only mounts.
+	VolumeReadOnlyMany VolumeAccessMode = "ReadOnlyMany"
+)
+
+// VolumeStorageType selects the backing storage contract.
+type VolumeStorageType string
+
+const (
+	// VolumeStorageCOS selects a COS prefix.
+	VolumeStorageCOS VolumeStorageType = "Cos"
+	// VolumeStorageCFS selects a CFS path.
+	VolumeStorageCFS VolumeStorageType = "Cfs"
+)
+
+// VolumeReclaimPolicy controls a template-derived Volume after its owning
+// Sandbox is deleted.
+type VolumeReclaimPolicy string
+
+const (
+	// VolumeReclaimRetain keeps a derived Volume after Sandbox deletion.
+	VolumeReclaimRetain VolumeReclaimPolicy = "Retain"
+	// VolumeReclaimDelete deletes a derived Volume after Sandbox deletion.
+	VolumeReclaimDelete VolumeReclaimPolicy = "Delete"
+)
+
+// VolumeState preserves the service state verbatim, including future values.
+type VolumeState string
+
+const (
+	// VolumeCreating means the resource is being provisioned.
+	VolumeCreating VolumeState = "CREATING"
+	// VolumeActive means the resource is ready for mounting.
+	VolumeActive VolumeState = "ACTIVE"
+	// VolumeDeleting means deletion is in progress.
+	VolumeDeleting VolumeState = "DELETING"
+	// VolumeDeleteFailed means the service could not finish deletion.
+	VolumeDeleteFailed VolumeState = "DELETE_FAILED"
+	// VolumeFailed means provisioning or reconciliation failed.
+	VolumeFailed VolumeState = "FAILED"
+)
+
+// VolumeTag is one Cloud resource tag.
+type VolumeTag struct {
+	// Key is the tag key.
+	Key string
+	// Value is the tag value.
+	Value string
+}
+
+// VolumeFilter is one service-defined exact list filter.
+type VolumeFilter struct {
+	// Name is the service filter name.
+	Name string
+	// Values are ORed inside this filter.
+	Values []string
+}
+
+// VolumeCOSStorage identifies one concrete COS prefix.
+type VolumeCOSStorage struct {
+	// Endpoint is the COS regional endpoint.
+	Endpoint string
+	// BucketName is the COS bucket name.
+	BucketName string
+	// BucketPath is the concrete prefix inside the bucket.
+	BucketPath string
+}
+
+// VolumeCFSStorage identifies one concrete CFS path.
+type VolumeCFSStorage struct {
+	// FileSystemID identifies the existing CFS file system.
+	FileSystemID string
+	// Path is the concrete directory in that file system.
+	Path string
+}
+
+// VolumeStorage selects exactly one concrete COS or CFS backing store.
+type VolumeStorage struct {
+	// COS selects COS storage.
+	COS *VolumeCOSStorage
+	// CFS selects CFS storage.
+	CFS *VolumeCFSStorage
+}
+
+// String returns a redacted storage representation.
+func (VolumeStorage) String() string { return "VolumeStorage{REDACTED}" }
+
+// GoString returns the same redacted representation as String.
+func (v VolumeStorage) GoString() string { return v.String() }
+
+// CreateVolumeOptions creates a standalone AGR Volume. Deleting the Volume
+// record does not claim to delete the referenced COS or CFS storage.
+type CreateVolumeOptions struct {
+	// Name is unique within the account and region.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// StorageType must match the selected Storage backend.
+	StorageType VolumeStorageType
+	// Storage identifies one existing backing location.
+	Storage VolumeStorage
+	// Tags is the initial complete tag set.
+	Tags []VolumeTag
+	// ClientToken is optional idempotency material.
+	ClientToken string
+	// StorageRoleARN is the role used to access backing storage.
+	StorageRoleARN string
+}
+
+// String returns a redacted representation.
+func (CreateVolumeOptions) String() string { return "CreateVolumeOptions{REDACTED}" }
+
+// GoString returns the same redacted representation as String.
+func (v CreateVolumeOptions) GoString() string { return v.String() }
+
+// VolumeListOptions selects one offset-based Volume page.
+type VolumeListOptions struct {
+	// IDs selects exact Volume identities.
+	IDs []string
+	// Names selects exact Volume names.
+	Names []string
+	// Filters are ANDed by the service.
+	Filters []VolumeFilter
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+}
+
+// UpdateVolumeOptions contains mutable Volume fields.
+type UpdateVolumeOptions struct {
+	// Tags replaces the complete tag set. A pointer to an empty slice clears it.
+	Tags *[]VolumeTag
+}
+
+// VolumeInfo is an immutable service snapshot.
+type VolumeInfo struct {
+	// ID is the stable Volume identity.
+	ID string
+	// Name is the account-local Volume name.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// ReclaimPolicy reports template-owned cleanup behavior.
+	ReclaimPolicy VolumeReclaimPolicy
+	// State preserves the service value, including unknown future values.
+	State VolumeState
+	// StorageType identifies the backing storage kind.
+	StorageType VolumeStorageType
+	// Storage contains the backing location and is redacted when formatted.
+	Storage VolumeStorage
+	// TemplateID identifies the source template for a derived Volume.
+	TemplateID string
+	// ReuseKey identifies the template reuse partition.
+	ReuseKey string
+	// Tags is the current complete tag set.
+	Tags []VolumeTag
+	// CreatedAt is the service creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the service update timestamp.
+	UpdatedAt time.Time
+	// StorageRoleARN is the backing-storage access role.
+	StorageRoleARN string
+	// MountedInstanceID reports the current mounted Sandbox when available.
+	MountedInstanceID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+
+// String returns a representation that omits backing storage details.
+func (v VolumeInfo) String() string {
+	return "VolumeInfo{ID:" + v.ID + ",Name:" + v.Name + ",State:" + string(v.State) + "}"
+}
+
+// GoString returns the same redacted representation as String.
+func (v VolumeInfo) GoString() string { return v.String() }
+
+// VolumeMutationResult confirms an accepted mutation.
+type VolumeMutationResult struct {
+	// VolumeID identifies the mutation target.
+	VolumeID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+
+// VolumePage is one service-reported offset page.
+type VolumePage struct {
+	// Items contains Volume snapshots.
+	Items []VolumeInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+
+type volumeControlPlane interface {
+	CreateVolume(context.Context, CreateVolumeOptions) (VolumeInfo, error)
+	GetVolume(context.Context, string) (VolumeInfo, error)
+	ListVolumes(context.Context, VolumeListOptions) (VolumePage, error)
+	UpdateVolume(context.Context, string, UpdateVolumeOptions) (VolumeMutationResult, error)
+	DeleteVolume(context.Context, string) error
+}
+
+// VolumeManager manages Preview Volumes for one Client identity and region.
+type VolumeManager struct{ client *Client }
+
+func (m *VolumeManager) transport(operation string) (volumeControlPlane, error) {
+	value, ok := m.client.cfg.control.(volumeControlPlane)
+	if !ok {
+		return nil, codeError(Unsupported, operation, "VOLUME_CONTROL_UNAVAILABLE")
+	}
+	return value, nil
+}
+
+// Create creates one standalone Volume without creating its backing storage.
+func (m *VolumeManager) Create(ctx context.Context, opts CreateVolumeOptions) (VolumeInfo, error) {
+	opts = copyCreateVolumeOptions(opts)
+	if err := validateCreateVolume(opts); err != nil {
+		return VolumeInfo{}, err
+	}
+	cp, err := m.transport("Volumes.Create")
+	if err != nil {
+		return VolumeInfo{}, err
+	}
+	return cp.CreateVolume(ctx, opts)
+}
+
+// Get returns the exact Volume ID or NotFound.
+func (m *VolumeManager) Get(ctx context.Context, id string) (VolumeInfo, error) {
+	if strings.TrimSpace(id) == "" {
+		return VolumeInfo{}, codeError(InvalidArgument, "Volumes.Get", "VOLUME_ID_REQUIRED")
+	}
+	cp, err := m.transport("Volumes.Get")
+	if err != nil {
+		return VolumeInfo{}, err
+	}
+	return cp.GetVolume(ctx, id)
+}
+
+// List returns one server-filtered offset page.
+func (m *VolumeManager) List(ctx context.Context, opts VolumeListOptions) (VolumePage, error) {
+	opts = copyVolumeListOptions(opts)
+	if err := validateVolumeList(opts, "Volumes.List"); err != nil {
+		return VolumePage{}, err
+	}
+	if opts.Limit == 0 {
+		opts.Limit = 20
+	}
+	cp, err := m.transport("Volumes.List")
+	if err != nil {
+		return VolumePage{}, err
+	}
+	return cp.ListVolumes(ctx, opts)
+}
+
+// Update replaces mutable fields on one exact Volume ID.
+func (m *VolumeManager) Update(ctx context.Context, id string, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
+	if strings.TrimSpace(id) == "" {
+		return VolumeMutationResult{}, codeError(InvalidArgument, "Volumes.Update", "VOLUME_ID_REQUIRED")
+	}
+	opts = copyUpdateVolumeOptions(opts)
+	if opts.Tags == nil {
+		return VolumeMutationResult{}, codeError(InvalidArgument, "Volumes.Update", "UPDATE_REQUIRED")
+	}
+	cp, err := m.transport("Volumes.Update")
+	if err != nil {
+		return VolumeMutationResult{}, err
+	}
+	return cp.UpdateVolume(ctx, id, opts)
+}
+
+// Delete removes the Volume record and does not claim to delete backing storage.
+func (m *VolumeManager) Delete(ctx context.Context, id string) error {
+	if strings.TrimSpace(id) == "" {
+		return codeError(InvalidArgument, "Volumes.Delete", "VOLUME_ID_REQUIRED")
+	}
+	cp, err := m.transport("Volumes.Delete")
+	if err != nil {
+		return err
+	}
+	return cp.DeleteVolume(ctx, id)
+}
+
+func validateCreateVolume(value CreateVolumeOptions) error {
+	if strings.TrimSpace(value.Name) == "" {
+		return codeError(InvalidArgument, "Volumes.Create", "VOLUME_NAME_REQUIRED")
+	}
+	if !validVolumeAccessMode(value.AccessMode) {
+		return codeError(InvalidArgument, "Volumes.Create", "ACCESS_MODE_INVALID")
+	}
+	if err := validateVolumeStorage(value.StorageType, value.Storage, "Volumes.Create"); err != nil {
+		return err
+	}
+	if len(value.ClientToken) > 64 {
+		return codeError(InvalidArgument, "Volumes.Create", "CLIENT_TOKEN_INVALID")
+	}
+	return nil
+}
+
+func validateVolumeStorage(kind VolumeStorageType, value VolumeStorage, operation string) error {
+	count := 0
+	if value.COS != nil {
+		count++
+		if value.COS.Endpoint == "" || value.COS.BucketName == "" || value.COS.BucketPath == "" {
+			return codeError(InvalidArgument, operation, "STORAGE_INVALID")
+		}
+	}
+	if value.CFS != nil {
+		count++
+		if value.CFS.FileSystemID == "" || value.CFS.Path == "" {
+			return codeError(InvalidArgument, operation, "STORAGE_INVALID")
+		}
+	}
+	if count != 1 || (kind == VolumeStorageCOS) != (value.COS != nil) || (kind == VolumeStorageCFS) != (value.CFS != nil) {
+		return codeError(InvalidArgument, operation, "STORAGE_TYPE_MISMATCH")
+	}
+	return nil
+}
+
+func validVolumeAccessMode(value VolumeAccessMode) bool {
+	return value == VolumeReadWriteOnce || value == VolumeReadWriteMany || value == VolumeReadOnlyMany
+}
+
+func validateVolumeList(value VolumeListOptions, operation string) error {
+	if value.Offset < 0 || value.Limit < 0 || value.Limit > 100 {
+		return codeError(InvalidArgument, operation, "PAGINATION_INVALID")
+	}
+	if len(value.IDs) > 100 {
+		return codeError(InvalidArgument, operation, "TOO_MANY_VOLUME_IDS")
+	}
+	for _, id := range value.IDs {
+		if strings.TrimSpace(id) == "" {
+			return codeError(InvalidArgument, operation, "VOLUME_ID_REQUIRED")
+		}
+	}
+	for _, name := range value.Names {
+		if strings.TrimSpace(name) == "" {
+			return codeError(InvalidArgument, operation, "VOLUME_NAME_REQUIRED")
+		}
+	}
+	for _, filter := range value.Filters {
+		if filter.Name == "" || len(filter.Values) == 0 {
+			return codeError(InvalidArgument, operation, "FILTER_INVALID")
+		}
+		for _, item := range filter.Values {
+			if item == "" {
+				return codeError(InvalidArgument, operation, "FILTER_INVALID")
+			}
+		}
+	}
+	return nil
+}
+
+func copyCreateVolumeOptions(value CreateVolumeOptions) CreateVolumeOptions {
+	value.Tags = append([]VolumeTag(nil), value.Tags...)
+	value.Storage = copyVolumeStorage(value.Storage)
+	return value
+}
+
+func copyVolumeStorage(value VolumeStorage) VolumeStorage {
+	out := VolumeStorage{}
+	if value.COS != nil {
+		copy := *value.COS
+		out.COS = &copy
+	}
+	if value.CFS != nil {
+		copy := *value.CFS
+		out.CFS = &copy
+	}
+	return out
+}
+
+func copyVolumeListOptions(value VolumeListOptions) VolumeListOptions {
+	value.IDs = append([]string(nil), value.IDs...)
+	value.Names = append([]string(nil), value.Names...)
+	value.Filters = append([]VolumeFilter(nil), value.Filters...)
+	for i := range value.Filters {
+		value.Filters[i].Values = append([]string(nil), value.Filters[i].Values...)
+	}
+	return value
+}
+
+func copyUpdateVolumeOptions(value UpdateVolumeOptions) UpdateVolumeOptions {
+	if value.Tags != nil {
+		tags := append([]VolumeTag(nil), (*value.Tags)...)
+		value.Tags = &tags
+	}
+	return value
+}
+
+// VolumeTemplateCOSStorage identifies a COS prefix pattern for derived Volumes.
+type VolumeTemplateCOSStorage struct {
+	// Endpoint is the COS regional endpoint.
+	Endpoint string
+	// BucketName is the COS bucket name.
+	BucketName string
+	// BucketPathPattern may contain ${reuse_key}.
+	BucketPathPattern string
+}
+
+// VolumeTemplateCFSStorage identifies a CFS path pattern for derived Volumes.
+type VolumeTemplateCFSStorage struct {
+	// FileSystemID identifies the existing CFS file system.
+	FileSystemID string
+	// PathPattern may contain ${reuse_key}.
+	PathPattern string
+}
+
+// VolumeTemplateStorage selects exactly one COS or CFS pattern.
+type VolumeTemplateStorage struct {
+	// COS selects a COS prefix pattern.
+	COS *VolumeTemplateCOSStorage
+	// CFS selects a CFS path pattern.
+	CFS *VolumeTemplateCFSStorage
+}
+
+// String returns a redacted storage representation.
+func (VolumeTemplateStorage) String() string { return "VolumeTemplateStorage{REDACTED}" }
+
+// GoString returns the same redacted representation as String.
+func (v VolumeTemplateStorage) GoString() string { return v.String() }
+
+// CreateVolumeTemplateOptions creates one derivation and reuse policy.
+type CreateVolumeTemplateOptions struct {
+	// Name is unique within the account and region.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// ReclaimPolicy controls a derived Volume after Sandbox deletion.
+	ReclaimPolicy VolumeReclaimPolicy
+	// StorageType must match the selected Storage backend.
+	StorageType VolumeStorageType
+	// Storage identifies one backing location pattern.
+	Storage VolumeTemplateStorage
+	// VolumeNamePattern may contain ${reuse_key}.
+	VolumeNamePattern string
+	// DefaultCapacity is a service-defined capacity value.
+	DefaultCapacity string
+	// StorageRoleARN is the role used to access backing storage.
+	StorageRoleARN string
+	// Tags is the initial complete tag set.
+	Tags []VolumeTag
+	// ClientToken is optional idempotency material.
+	ClientToken string
+}
+
+// String returns a redacted representation.
+func (CreateVolumeTemplateOptions) String() string { return "CreateVolumeTemplateOptions{REDACTED}" }
+
+// GoString returns the same redacted representation as String.
+func (v CreateVolumeTemplateOptions) GoString() string { return v.String() }
+
+// VolumeTemplateListOptions selects one offset-based template page.
+type VolumeTemplateListOptions struct {
+	// IDs selects exact VolumeTemplate identities.
+	IDs []string
+	// Names selects exact VolumeTemplate names.
+	Names []string
+	// Filters are ANDed by the service.
+	Filters []VolumeFilter
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+}
+
+// UpdateVolumeTemplateOptions contains mutable template fields.
+type UpdateVolumeTemplateOptions struct {
+	// Tags replaces the complete tag set; an empty slice clears it.
+	Tags *[]VolumeTag
+	// DefaultCapacity preserves omission versus explicit empty text.
+	DefaultCapacity *string
+}
+
+// VolumeTemplateInfo is an immutable service snapshot.
+type VolumeTemplateInfo struct {
+	// ID is the stable VolumeTemplate identity.
+	ID string
+	// Name is the account-local VolumeTemplate name.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// ReclaimPolicy controls derived Volume cleanup.
+	ReclaimPolicy VolumeReclaimPolicy
+	// State preserves the service value, including unknown future values.
+	State VolumeState
+	// StorageType identifies the backing storage kind.
+	StorageType VolumeStorageType
+	// Storage contains the backing pattern and is redacted when formatted.
+	Storage VolumeTemplateStorage
+	// VolumeNamePattern is applied to derived Volumes.
+	VolumeNamePattern string
+	// DefaultCapacity is the service-defined default capacity.
+	DefaultCapacity string
+	// StorageRoleARN is the backing-storage access role.
+	StorageRoleARN string
+	// Tags is the current complete tag set.
+	Tags []VolumeTag
+	// CreatedAt is the service creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the service update timestamp.
+	UpdatedAt time.Time
+	// RequestID is service correlation data.
+	RequestID string
+}
+
+// String returns a representation that omits backing storage details.
+func (v VolumeTemplateInfo) String() string {
+	return "VolumeTemplateInfo{ID:" + v.ID + ",Name:" + v.Name + ",State:" + string(v.State) + "}"
+}
+
+// GoString returns the same redacted representation as String.
+func (v VolumeTemplateInfo) GoString() string { return v.String() }
+
+// VolumeTemplateMutationResult confirms an accepted mutation.
+type VolumeTemplateMutationResult struct {
+	// VolumeTemplateID identifies the mutation target.
+	VolumeTemplateID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+
+// VolumeTemplatePage is one service-reported offset page.
+type VolumeTemplatePage struct {
+	// Items contains VolumeTemplate snapshots.
+	Items []VolumeTemplateInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+
+type volumeTemplateControlPlane interface {
+	CreateVolumeTemplate(context.Context, CreateVolumeTemplateOptions) (VolumeTemplateInfo, error)
+	GetVolumeTemplate(context.Context, string) (VolumeTemplateInfo, error)
+	ListVolumeTemplates(context.Context, VolumeTemplateListOptions) (VolumeTemplatePage, error)
+	UpdateVolumeTemplate(context.Context, string, UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error)
+	DeleteVolumeTemplate(context.Context, string) error
+}
+
+// VolumeTemplateManager manages Preview templates for one Client identity and region.
+type VolumeTemplateManager struct{ client *Client }
+
+func (m *VolumeTemplateManager) transport(operation string) (volumeTemplateControlPlane, error) {
+	value, ok := m.client.cfg.control.(volumeTemplateControlPlane)
+	if !ok {
+		return nil, codeError(Unsupported, operation, "VOLUME_TEMPLATE_CONTROL_UNAVAILABLE")
+	}
+	return value, nil
+}
+
+// Create creates one VolumeTemplate without creating backing storage.
+func (m *VolumeTemplateManager) Create(ctx context.Context, opts CreateVolumeTemplateOptions) (VolumeTemplateInfo, error) {
+	opts = copyCreateVolumeTemplateOptions(opts)
+	if err := validateCreateVolumeTemplate(opts); err != nil {
+		return VolumeTemplateInfo{}, err
+	}
+	cp, err := m.transport("VolumeTemplates.Create")
+	if err != nil {
+		return VolumeTemplateInfo{}, err
+	}
+	return cp.CreateVolumeTemplate(ctx, opts)
+}
+
+// Get returns the exact VolumeTemplate ID or NotFound.
+func (m *VolumeTemplateManager) Get(ctx context.Context, id string) (VolumeTemplateInfo, error) {
+	if strings.TrimSpace(id) == "" {
+		return VolumeTemplateInfo{}, codeError(InvalidArgument, "VolumeTemplates.Get", "VOLUME_TEMPLATE_ID_REQUIRED")
+	}
+	cp, err := m.transport("VolumeTemplates.Get")
+	if err != nil {
+		return VolumeTemplateInfo{}, err
+	}
+	return cp.GetVolumeTemplate(ctx, id)
+}
+
+// List returns one server-filtered offset page.
+func (m *VolumeTemplateManager) List(ctx context.Context, opts VolumeTemplateListOptions) (VolumeTemplatePage, error) {
+	opts = copyVolumeTemplateListOptions(opts)
+	if err := validateVolumeTemplateList(opts); err != nil {
+		return VolumeTemplatePage{}, err
+	}
+	if opts.Limit == 0 {
+		opts.Limit = 20
+	}
+	cp, err := m.transport("VolumeTemplates.List")
+	if err != nil {
+		return VolumeTemplatePage{}, err
+	}
+	return cp.ListVolumeTemplates(ctx, opts)
+}
+
+// Update replaces mutable fields on one exact VolumeTemplate ID.
+func (m *VolumeTemplateManager) Update(ctx context.Context, id string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
+	if strings.TrimSpace(id) == "" {
+		return VolumeTemplateMutationResult{}, codeError(InvalidArgument, "VolumeTemplates.Update", "VOLUME_TEMPLATE_ID_REQUIRED")
+	}
+	opts = copyUpdateVolumeTemplateOptions(opts)
+	if opts.Tags == nil && opts.DefaultCapacity == nil {
+		return VolumeTemplateMutationResult{}, codeError(InvalidArgument, "VolumeTemplates.Update", "UPDATE_REQUIRED")
+	}
+	cp, err := m.transport("VolumeTemplates.Update")
+	if err != nil {
+		return VolumeTemplateMutationResult{}, err
+	}
+	return cp.UpdateVolumeTemplate(ctx, id, opts)
+}
+
+// Delete removes one exact VolumeTemplate ID after dependent Volumes are gone.
+func (m *VolumeTemplateManager) Delete(ctx context.Context, id string) error {
+	if strings.TrimSpace(id) == "" {
+		return codeError(InvalidArgument, "VolumeTemplates.Delete", "VOLUME_TEMPLATE_ID_REQUIRED")
+	}
+	cp, err := m.transport("VolumeTemplates.Delete")
+	if err != nil {
+		return err
+	}
+	return cp.DeleteVolumeTemplate(ctx, id)
+}
+
+func validateCreateVolumeTemplate(value CreateVolumeTemplateOptions) error {
+	if strings.TrimSpace(value.Name) == "" {
+		return codeError(InvalidArgument, "VolumeTemplates.Create", "VOLUME_TEMPLATE_NAME_REQUIRED")
+	}
+	if !validVolumeAccessMode(value.AccessMode) {
+		return codeError(InvalidArgument, "VolumeTemplates.Create", "ACCESS_MODE_INVALID")
+	}
+	if value.ReclaimPolicy != VolumeReclaimRetain && value.ReclaimPolicy != VolumeReclaimDelete {
+		return codeError(InvalidArgument, "VolumeTemplates.Create", "RECLAIM_POLICY_INVALID")
+	}
+	if err := validateVolumeTemplateStorage(value.StorageType, value.Storage); err != nil {
+		return err
+	}
+	if len(value.ClientToken) > 64 {
+		return codeError(InvalidArgument, "VolumeTemplates.Create", "CLIENT_TOKEN_INVALID")
+	}
+	return nil
+}
+
+func validateVolumeTemplateStorage(kind VolumeStorageType, value VolumeTemplateStorage) error {
+	count := 0
+	if value.COS != nil {
+		count++
+		if value.COS.Endpoint == "" || value.COS.BucketName == "" || value.COS.BucketPathPattern == "" {
+			return codeError(InvalidArgument, "VolumeTemplates.Create", "STORAGE_INVALID")
+		}
+	}
+	if value.CFS != nil {
+		count++
+		if value.CFS.FileSystemID == "" || value.CFS.PathPattern == "" {
+			return codeError(InvalidArgument, "VolumeTemplates.Create", "STORAGE_INVALID")
+		}
+	}
+	if count != 1 || (kind == VolumeStorageCOS) != (value.COS != nil) || (kind == VolumeStorageCFS) != (value.CFS != nil) {
+		return codeError(InvalidArgument, "VolumeTemplates.Create", "STORAGE_TYPE_MISMATCH")
+	}
+	return nil
+}
+
+func validateVolumeTemplateList(value VolumeTemplateListOptions) error {
+	return validateVolumeList(VolumeListOptions{IDs: value.IDs, Names: value.Names, Filters: value.Filters, Offset: value.Offset, Limit: value.Limit}, "VolumeTemplates.List")
+}
+
+func copyCreateVolumeTemplateOptions(value CreateVolumeTemplateOptions) CreateVolumeTemplateOptions {
+	value.Tags = append([]VolumeTag(nil), value.Tags...)
+	value.Storage = copyVolumeTemplateStorage(value.Storage)
+	return value
+}
+
+func copyVolumeTemplateStorage(value VolumeTemplateStorage) VolumeTemplateStorage {
+	out := VolumeTemplateStorage{}
+	if value.COS != nil {
+		copy := *value.COS
+		out.COS = &copy
+	}
+	if value.CFS != nil {
+		copy := *value.CFS
+		out.CFS = &copy
+	}
+	return out
+}
+
+func copyVolumeTemplateListOptions(value VolumeTemplateListOptions) VolumeTemplateListOptions {
+	shared := copyVolumeListOptions(VolumeListOptions{IDs: value.IDs, Names: value.Names, Filters: value.Filters, Offset: value.Offset, Limit: value.Limit})
+	return VolumeTemplateListOptions{IDs: shared.IDs, Names: shared.Names, Filters: shared.Filters, Offset: shared.Offset, Limit: shared.Limit}
+}
+
+func copyUpdateVolumeTemplateOptions(value UpdateVolumeTemplateOptions) UpdateVolumeTemplateOptions {
+	if value.Tags != nil {
+		tags := append([]VolumeTag(nil), (*value.Tags)...)
+		value.Tags = &tags
+	}
+	if value.DefaultCapacity != nil {
+		capacity := *value.DefaultCapacity
+		value.DefaultCapacity = &capacity
+	}
+	return value
 }

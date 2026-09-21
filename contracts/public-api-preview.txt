@@ -85,6 +85,12 @@ func (c *Client) Tools() *ToolManager
     Tools returns the sandbox-tool control service bound to this client's Cloud
     identity.
 
+func (c *Client) VolumeTemplates() *VolumeTemplateManager
+    VolumeTemplates returns the Preview derived-Volume template service.
+
+func (c *Client) Volumes() *VolumeManager
+    Volumes returns the Preview standalone Volume service.
+
 type ClientOption func(*clientConfig)
     ClientOption configures NewClient. Use the provided With functions; private
     configuration is not an extension API.
@@ -532,6 +538,61 @@ func (o CreateToolOptions) GoString() string
 func (CreateToolOptions) String() string
     String returns a redacted representation because custom configuration can
     contain secrets.
+
+type CreateVolumeOptions struct {
+	// Name is unique within the account and region.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// StorageType must match the selected Storage backend.
+	StorageType VolumeStorageType
+	// Storage identifies one existing backing location.
+	Storage VolumeStorage
+	// Tags is the initial complete tag set.
+	Tags []VolumeTag
+	// ClientToken is optional idempotency material.
+	ClientToken string
+	// StorageRoleARN is the role used to access backing storage.
+	StorageRoleARN string
+}
+    CreateVolumeOptions creates a standalone AGR Volume. Deleting the Volume
+    record does not claim to delete the referenced COS or CFS storage.
+
+func (v CreateVolumeOptions) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (CreateVolumeOptions) String() string
+    String returns a redacted representation.
+
+type CreateVolumeTemplateOptions struct {
+	// Name is unique within the account and region.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// ReclaimPolicy controls a derived Volume after Sandbox deletion.
+	ReclaimPolicy VolumeReclaimPolicy
+	// StorageType must match the selected Storage backend.
+	StorageType VolumeStorageType
+	// Storage identifies one backing location pattern.
+	Storage VolumeTemplateStorage
+	// VolumeNamePattern may contain ${reuse_key}.
+	VolumeNamePattern string
+	// DefaultCapacity is a service-defined capacity value.
+	DefaultCapacity string
+	// StorageRoleARN is the role used to access backing storage.
+	StorageRoleARN string
+	// Tags is the initial complete tag set.
+	Tags []VolumeTag
+	// ClientToken is optional idempotency material.
+	ClientToken string
+}
+    CreateVolumeTemplateOptions creates one derivation and reuse policy.
+
+func (v CreateVolumeTemplateOptions) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (CreateVolumeTemplateOptions) String() string
+    String returns a redacted representation.
 
 type CredentialProvider interface {
 	// Retrieve resolves the Cloud credential pair for a signed request. Honor cancellation;
@@ -2043,6 +2104,10 @@ type ToolStorageMount struct {
 	ReadOnly *bool
 	// Source is the storage backend; nil preserves the service default.
 	Source *ToolStorageSource
+	// Volume mounts one existing Preview Volume. It is mutually exclusive with Source and VolumeTemplate.
+	Volume *ToolVolumeRef
+	// VolumeTemplate derives or reuses a Preview Volume. It is mutually exclusive with Source and Volume.
+	VolumeTemplate *ToolVolumeTemplateRef
 }
     ToolStorageMount declares one mount available to Sandboxes created from a
     Tool.
@@ -2099,6 +2164,22 @@ type ToolVPCConfiguration struct {
 }
     ToolVPCConfiguration identifies VPC attachments.
 
+type ToolVolumeRef struct {
+	// ID is the stable Volume identity.
+	ID string
+	// Name is the account-local Volume name.
+	Name string
+}
+    ToolVolumeRef selects one existing Preview Volume by exactly one identity.
+
+type ToolVolumeTemplateRef struct {
+	// Name is the VolumeTemplate name.
+	Name string
+	// ReuseKey may be a literal or an unmodified ${metadata.<key>} expression.
+	ReuseKey string
+}
+    ToolVolumeTemplateRef derives or reuses a Volume from a Preview template.
+
 type UnavailableMetric struct {
 	// Name identifies the failed query.
 	Name SandboxMetricName
@@ -2152,6 +2233,335 @@ type UpdateToolOptions struct {
 }
     UpdateToolOptions uses pointers to distinguish omission from an explicit
     empty value.
+
+type UpdateVolumeOptions struct {
+	// Tags replaces the complete tag set. A pointer to an empty slice clears it.
+	Tags *[]VolumeTag
+}
+    UpdateVolumeOptions contains mutable Volume fields.
+
+type UpdateVolumeTemplateOptions struct {
+	// Tags replaces the complete tag set; an empty slice clears it.
+	Tags *[]VolumeTag
+	// DefaultCapacity preserves omission versus explicit empty text.
+	DefaultCapacity *string
+}
+    UpdateVolumeTemplateOptions contains mutable template fields.
+
+type VolumeAccessMode string
+    VolumeAccessMode controls how many Sandbox instances may mount a Volume and
+    whether those mounts are writable.
+
+const (
+	// VolumeReadWriteOnce allows one writable mount.
+	VolumeReadWriteOnce VolumeAccessMode = "ReadWriteOnce"
+	// VolumeReadWriteMany allows multiple writable mounts.
+	VolumeReadWriteMany VolumeAccessMode = "ReadWriteMany"
+	// VolumeReadOnlyMany allows multiple read-only mounts.
+	VolumeReadOnlyMany VolumeAccessMode = "ReadOnlyMany"
+)
+type VolumeCFSStorage struct {
+	// FileSystemID identifies the existing CFS file system.
+	FileSystemID string
+	// Path is the concrete directory in that file system.
+	Path string
+}
+    VolumeCFSStorage identifies one concrete CFS path.
+
+type VolumeCOSStorage struct {
+	// Endpoint is the COS regional endpoint.
+	Endpoint string
+	// BucketName is the COS bucket name.
+	BucketName string
+	// BucketPath is the concrete prefix inside the bucket.
+	BucketPath string
+}
+    VolumeCOSStorage identifies one concrete COS prefix.
+
+type VolumeFilter struct {
+	// Name is the service filter name.
+	Name string
+	// Values are ORed inside this filter.
+	Values []string
+}
+    VolumeFilter is one service-defined exact list filter.
+
+type VolumeInfo struct {
+	// ID is the stable Volume identity.
+	ID string
+	// Name is the account-local Volume name.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// ReclaimPolicy reports template-owned cleanup behavior.
+	ReclaimPolicy VolumeReclaimPolicy
+	// State preserves the service value, including unknown future values.
+	State VolumeState
+	// StorageType identifies the backing storage kind.
+	StorageType VolumeStorageType
+	// Storage contains the backing location and is redacted when formatted.
+	Storage VolumeStorage
+	// TemplateID identifies the source template for a derived Volume.
+	TemplateID string
+	// ReuseKey identifies the template reuse partition.
+	ReuseKey string
+	// Tags is the current complete tag set.
+	Tags []VolumeTag
+	// CreatedAt is the service creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the service update timestamp.
+	UpdatedAt time.Time
+	// StorageRoleARN is the backing-storage access role.
+	StorageRoleARN string
+	// MountedInstanceID reports the current mounted Sandbox when available.
+	MountedInstanceID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    VolumeInfo is an immutable service snapshot.
+
+func (v VolumeInfo) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (v VolumeInfo) String() string
+    String returns a representation that omits backing storage details.
+
+type VolumeListOptions struct {
+	// IDs selects exact Volume identities.
+	IDs []string
+	// Names selects exact Volume names.
+	Names []string
+	// Filters are ANDed by the service.
+	Filters []VolumeFilter
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+}
+    VolumeListOptions selects one offset-based Volume page.
+
+type VolumeManager struct {
+	// Has unexported fields.
+}
+    VolumeManager manages Preview Volumes for one Client identity and region.
+
+func (m *VolumeManager) Create(ctx context.Context, opts CreateVolumeOptions) (VolumeInfo, error)
+    Create creates one standalone Volume without creating its backing storage.
+
+func (m *VolumeManager) Delete(ctx context.Context, id string) error
+    Delete removes the Volume record and does not claim to delete backing
+    storage.
+
+func (m *VolumeManager) Get(ctx context.Context, id string) (VolumeInfo, error)
+    Get returns the exact Volume ID or NotFound.
+
+func (m *VolumeManager) List(ctx context.Context, opts VolumeListOptions) (VolumePage, error)
+    List returns one server-filtered offset page.
+
+func (m *VolumeManager) Update(ctx context.Context, id string, opts UpdateVolumeOptions) (VolumeMutationResult, error)
+    Update replaces mutable fields on one exact Volume ID.
+
+type VolumeMutationResult struct {
+	// VolumeID identifies the mutation target.
+	VolumeID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    VolumeMutationResult confirms an accepted mutation.
+
+type VolumePage struct {
+	// Items contains Volume snapshots.
+	Items []VolumeInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+    VolumePage is one service-reported offset page.
+
+type VolumeReclaimPolicy string
+    VolumeReclaimPolicy controls a template-derived Volume after its owning
+    Sandbox is deleted.
+
+const (
+	// VolumeReclaimRetain keeps a derived Volume after Sandbox deletion.
+	VolumeReclaimRetain VolumeReclaimPolicy = "Retain"
+	// VolumeReclaimDelete deletes a derived Volume after Sandbox deletion.
+	VolumeReclaimDelete VolumeReclaimPolicy = "Delete"
+)
+type VolumeState string
+    VolumeState preserves the service state verbatim, including future values.
+
+const (
+	// VolumeCreating means the resource is being provisioned.
+	VolumeCreating VolumeState = "CREATING"
+	// VolumeActive means the resource is ready for mounting.
+	VolumeActive VolumeState = "ACTIVE"
+	// VolumeDeleting means deletion is in progress.
+	VolumeDeleting VolumeState = "DELETING"
+	// VolumeDeleteFailed means the service could not finish deletion.
+	VolumeDeleteFailed VolumeState = "DELETE_FAILED"
+	// VolumeFailed means provisioning or reconciliation failed.
+	VolumeFailed VolumeState = "FAILED"
+)
+type VolumeStorage struct {
+	// COS selects COS storage.
+	COS *VolumeCOSStorage
+	// CFS selects CFS storage.
+	CFS *VolumeCFSStorage
+}
+    VolumeStorage selects exactly one concrete COS or CFS backing store.
+
+func (v VolumeStorage) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (VolumeStorage) String() string
+    String returns a redacted storage representation.
+
+type VolumeStorageType string
+    VolumeStorageType selects the backing storage contract.
+
+const (
+	// VolumeStorageCOS selects a COS prefix.
+	VolumeStorageCOS VolumeStorageType = "Cos"
+	// VolumeStorageCFS selects a CFS path.
+	VolumeStorageCFS VolumeStorageType = "Cfs"
+)
+type VolumeTag struct {
+	// Key is the tag key.
+	Key string
+	// Value is the tag value.
+	Value string
+}
+    VolumeTag is one Cloud resource tag.
+
+type VolumeTemplateCFSStorage struct {
+	// FileSystemID identifies the existing CFS file system.
+	FileSystemID string
+	// PathPattern may contain ${reuse_key}.
+	PathPattern string
+}
+    VolumeTemplateCFSStorage identifies a CFS path pattern for derived Volumes.
+
+type VolumeTemplateCOSStorage struct {
+	// Endpoint is the COS regional endpoint.
+	Endpoint string
+	// BucketName is the COS bucket name.
+	BucketName string
+	// BucketPathPattern may contain ${reuse_key}.
+	BucketPathPattern string
+}
+    VolumeTemplateCOSStorage identifies a COS prefix pattern for derived
+    Volumes.
+
+type VolumeTemplateInfo struct {
+	// ID is the stable VolumeTemplate identity.
+	ID string
+	// Name is the account-local VolumeTemplate name.
+	Name string
+	// AccessMode controls concurrent and writable mounts.
+	AccessMode VolumeAccessMode
+	// ReclaimPolicy controls derived Volume cleanup.
+	ReclaimPolicy VolumeReclaimPolicy
+	// State preserves the service value, including unknown future values.
+	State VolumeState
+	// StorageType identifies the backing storage kind.
+	StorageType VolumeStorageType
+	// Storage contains the backing pattern and is redacted when formatted.
+	Storage VolumeTemplateStorage
+	// VolumeNamePattern is applied to derived Volumes.
+	VolumeNamePattern string
+	// DefaultCapacity is the service-defined default capacity.
+	DefaultCapacity string
+	// StorageRoleARN is the backing-storage access role.
+	StorageRoleARN string
+	// Tags is the current complete tag set.
+	Tags []VolumeTag
+	// CreatedAt is the service creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the service update timestamp.
+	UpdatedAt time.Time
+	// RequestID is service correlation data.
+	RequestID string
+}
+    VolumeTemplateInfo is an immutable service snapshot.
+
+func (v VolumeTemplateInfo) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (v VolumeTemplateInfo) String() string
+    String returns a representation that omits backing storage details.
+
+type VolumeTemplateListOptions struct {
+	// IDs selects exact VolumeTemplate identities.
+	IDs []string
+	// Names selects exact VolumeTemplate names.
+	Names []string
+	// Filters are ANDed by the service.
+	Filters []VolumeFilter
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+}
+    VolumeTemplateListOptions selects one offset-based template page.
+
+type VolumeTemplateManager struct {
+	// Has unexported fields.
+}
+    VolumeTemplateManager manages Preview templates for one Client identity and
+    region.
+
+func (m *VolumeTemplateManager) Create(ctx context.Context, opts CreateVolumeTemplateOptions) (VolumeTemplateInfo, error)
+    Create creates one VolumeTemplate without creating backing storage.
+
+func (m *VolumeTemplateManager) Delete(ctx context.Context, id string) error
+    Delete removes one exact VolumeTemplate ID after dependent Volumes are gone.
+
+func (m *VolumeTemplateManager) Get(ctx context.Context, id string) (VolumeTemplateInfo, error)
+    Get returns the exact VolumeTemplate ID or NotFound.
+
+func (m *VolumeTemplateManager) List(ctx context.Context, opts VolumeTemplateListOptions) (VolumeTemplatePage, error)
+    List returns one server-filtered offset page.
+
+func (m *VolumeTemplateManager) Update(ctx context.Context, id string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error)
+    Update replaces mutable fields on one exact VolumeTemplate ID.
+
+type VolumeTemplateMutationResult struct {
+	// VolumeTemplateID identifies the mutation target.
+	VolumeTemplateID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    VolumeTemplateMutationResult confirms an accepted mutation.
+
+type VolumeTemplatePage struct {
+	// Items contains VolumeTemplate snapshots.
+	Items []VolumeTemplateInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+    VolumeTemplatePage is one service-reported offset page.
+
+type VolumeTemplateStorage struct {
+	// COS selects a COS prefix pattern.
+	COS *VolumeTemplateCOSStorage
+	// CFS selects a CFS path pattern.
+	CFS *VolumeTemplateCFSStorage
+}
+    VolumeTemplateStorage selects exactly one COS or CFS pattern.
+
+func (v VolumeTemplateStorage) GoString() string
+    GoString returns the same redacted representation as String.
+
+func (VolumeTemplateStorage) String() string
+    String returns a redacted storage representation.
 
 type WatchHandle struct {
 	// Has unexported fields.
