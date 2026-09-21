@@ -30,10 +30,12 @@ serve the example's `/health`, `/events`, and `/ws` routes on that port. The SDK
 refreshes the Deployment access token internally. Closing the connection stops local HTTP/SSE/
 WebSocket work; only `Deployments().Delete` removes the remote resource.
 
-The persistent-volume example is available only from a Preview release. It requires a reviewed,
-disposable CFS fixture through `AGR_VOLUME_CFS_FILESYSTEM_ID`, an envd-capable
-`AGR_VOLUME_TOOL_TYPE`, and any role ARNs required by the account. It never deletes the CFS file
-system. The default region is `ap-guangzhou`; if `TENCENTCLOUD_REGION` overrides it, the CFS
-fixture must belong to that same region. A temporary bootstrap Tool/Sandbox creates and later removes only the example's unique
-CFS subpath. Cleanup runs in dependency order: workload Sandbox, Tool, retained derived Volumes,
-VolumeTemplate, standalone Volume, fixture subpath, bootstrap Sandbox, then bootstrap Tool.
+The persistent-volume example is available only from a Preview release. It requires exactly one
+reviewed storage fixture: `AGR_VOLUME_COS_ENDPOINT` together with `AGR_VOLUME_COS_BUCKET`, or
+`AGR_VOLUME_CFS_FILESYSTEM_ID`. It also requires an envd-capable `AGR_VOLUME_TOOL_TYPE` and any
+role ARNs required by the account. The default region is `ap-guangzhou`; if
+`TENCENTCLOUD_REGION` overrides it, the selected fixture must belong to that same region. A
+temporary bootstrap Tool/Sandbox creates and later removes only the example's unique COS prefix
+or CFS subpath. It never deletes the Bucket or CFS file system. Cleanup runs in dependency order:
+workload Sandbox, Tool, retained derived Volumes, VolumeTemplate, standalone Volume, fixture
+data, bootstrap Sandbox, then bootstrap Tool.

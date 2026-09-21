@@ -10,10 +10,13 @@ import (
 )
 
 func run() error {
-	fileSystemID := os.Getenv("AGR_VOLUME_CFS_FILESYSTEM_ID")
 	toolType := os.Getenv("AGR_VOLUME_TOOL_TYPE")
-	if fileSystemID == "" || toolType == "" {
-		return fmt.Errorf("AGR_VOLUME_CFS_FILESYSTEM_ID and AGR_VOLUME_TOOL_TYPE are required")
+	if toolType == "" {
+		return fmt.Errorf("AGR_VOLUME_TOOL_TYPE is required")
+	}
+	fixture, err := volumeFixtureFromEnv()
+	if err != nil {
+		return err
 	}
 	region := os.Getenv("TENCENTCLOUD_REGION")
 	if region == "" {
@@ -27,16 +30,13 @@ func run() error {
 	defer cancel()
 
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
-	basePath := "/agr-sdk-cookbook/" + suffix
+	basePath := "agr-sdk-cookbook/" + suffix
 	bootstrapTool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
-		Name:    "agr-sdk-volume-bootstrap-" + suffix,
-		Type:    agr.ToolType(toolType),
-		Network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
-		RoleARN: os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
-		StorageMounts: []agr.ToolStorageMount{{
-			Name: "bootstrap", MountPath: "/mnt/bootstrap",
-			Source: &agr.ToolStorageSource{CFS: &agr.ToolCFSStorage{FileSystemID: fileSystemID, Path: "/"}},
-		}},
+		Name:          "agr-sdk-volume-bootstrap-" + suffix,
+		Type:          agr.ToolType(toolType),
+		Network:       agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
+		RoleARN:       os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
+		StorageMounts: []agr.ToolStorageMount{fixture.bootstrapMount(basePath)},
 	})
 	if err != nil {
 		return err
@@ -55,24 +55,25 @@ func run() error {
 	}
 	defer bootstrap.Close()
 	defer deleteSandbox(bootstrap)
-	fixturePath := "/mnt/bootstrap" + basePath
-	defer removeFixturePath(bootstrap, fixturePath)
-	initialized, err := bootstrap.Commands().Run(ctx, "sh", agr.CommandOptions{Args: []string{"-lc", "mkdir -p -- " + fixturePath + "/direct " + fixturePath + "/" + suffix + "; chmod -R 0777 -- " + fixturePath}, User: agr.Root})
+	fixturePath := fixture.mountPath(basePath)
+	defer removeFixtureData(bootstrap, fixture.cleanupCommand(basePath))
+	initialize := "mkdir -p -- " + fixturePath + "/direct " + fixturePath + "/" + suffix
+	if fixture.storageType == agr.VolumeStorageCFS {
+		initialize += "; chmod -R 0777 -- " + fixturePath
+	}
+	initialized, err := bootstrap.Commands().Run(ctx, "sh", agr.CommandOptions{Args: []string{"-lc", initialize}, User: agr.Root})
 	if err != nil || initialized.ExitCode != 0 {
 		if err == nil {
-			err = fmt.Errorf("initialize CFS fixture: exit %d", initialized.ExitCode)
+			err = fmt.Errorf("initialize storage fixture: exit %d", initialized.ExitCode)
 		}
 		return err
 	}
 
 	volume, err := client.Volumes().Create(ctx, agr.CreateVolumeOptions{
-		Name:        "agr-sdk-volume-" + suffix,
-		AccessMode:  agr.VolumeReadWriteMany,
-		StorageType: agr.VolumeStorageCFS,
-		Storage: agr.VolumeStorage{CFS: &agr.VolumeCFSStorage{
-			FileSystemID: fileSystemID,
-			Path:         basePath + "/direct",
-		}},
+		Name:           "agr-sdk-volume-" + suffix,
+		AccessMode:     agr.VolumeReadWriteMany,
+		StorageType:    fixture.storageType,
+		Storage:        fixture.volumeStorage(basePath + "/direct"),
 		StorageRoleARN: os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),
 		Tags:           []agr.VolumeTag{{Key: "agr-sdk-example", Value: "owned"}},
 	})
@@ -85,8 +86,8 @@ func run() error {
 		Name:              "agr-sdk-template-" + suffix,
 		AccessMode:        agr.VolumeReadWriteMany,
 		ReclaimPolicy:     agr.VolumeReclaimRetain,
-		StorageType:       agr.VolumeStorageCFS,
-		Storage:           agr.VolumeTemplateStorage{CFS: &agr.VolumeTemplateCFSStorage{FileSystemID: fileSystemID, PathPattern: basePath + "/${reuse_key}"}},
+		StorageType:       fixture.storageType,
+		Storage:           fixture.volumeTemplateStorage(basePath + "/${reuse_key}"),
 		VolumeNamePattern: "agr-sdk-derived-${reuse_key}",
 		StorageRoleARN:    os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),
 		Tags:              []agr.VolumeTag{{Key: "agr-sdk-example", Value: "owned"}},
@@ -134,10 +135,75 @@ func run() error {
 	return nil
 }
 
-func removeFixturePath(sandbox *agr.Sandbox, path string) {
+func removeFixtureData(sandbox *agr.Sandbox, command string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	_, _ = sandbox.Commands().Run(ctx, "sh", agr.CommandOptions{Args: []string{"-lc", "rm -rf -- " + path}, User: agr.Root})
+	_, _ = sandbox.Commands().Run(ctx, "sh", agr.CommandOptions{Args: []string{"-lc", command}, User: agr.Root})
+}
+
+type volumeFixture struct {
+	storageType  agr.VolumeStorageType
+	cosEndpoint  string
+	cosBucket    string
+	fileSystemID string
+}
+
+func volumeFixtureFromEnv() (volumeFixture, error) {
+	fixture := volumeFixture{
+		cosEndpoint:  os.Getenv("AGR_VOLUME_COS_ENDPOINT"),
+		cosBucket:    os.Getenv("AGR_VOLUME_COS_BUCKET"),
+		fileSystemID: os.Getenv("AGR_VOLUME_CFS_FILESYSTEM_ID"),
+	}
+	if (fixture.cosEndpoint == "") != (fixture.cosBucket == "") {
+		return volumeFixture{}, fmt.Errorf("AGR_VOLUME_COS_ENDPOINT and AGR_VOLUME_COS_BUCKET must be set together")
+	}
+	hasCOS, hasCFS := fixture.cosEndpoint != "", fixture.fileSystemID != ""
+	if hasCOS == hasCFS {
+		return volumeFixture{}, fmt.Errorf("exactly one COS or CFS fixture is required")
+	}
+	fixture.storageType = agr.VolumeStorageCFS
+	if hasCOS {
+		fixture.storageType = agr.VolumeStorageCOS
+	}
+	return fixture, nil
+}
+
+func (f volumeFixture) bootstrapMount(path string) agr.ToolStorageMount {
+	source := &agr.ToolStorageSource{}
+	if f.storageType == agr.VolumeStorageCOS {
+		source.COS = &agr.ToolCOSStorage{Endpoint: f.cosEndpoint, BucketName: f.cosBucket, BucketPath: path}
+	} else {
+		source.CFS = &agr.ToolCFSStorage{FileSystemID: f.fileSystemID, Path: "/"}
+	}
+	return agr.ToolStorageMount{Name: "bootstrap", MountPath: "/mnt/bootstrap", Source: source}
+}
+
+func (f volumeFixture) mountPath(path string) string {
+	if f.storageType == agr.VolumeStorageCOS {
+		return "/mnt/bootstrap"
+	}
+	return "/mnt/bootstrap/" + path
+}
+
+func (f volumeFixture) cleanupCommand(path string) string {
+	if f.storageType == agr.VolumeStorageCOS {
+		return "rm -rf -- /mnt/bootstrap/* /mnt/bootstrap/.[!.]* /mnt/bootstrap/..?*; test -z \"$(ls -A /mnt/bootstrap)\""
+	}
+	return "rm -rf -- /mnt/bootstrap/" + path + "; test ! -e /mnt/bootstrap/" + path
+}
+
+func (f volumeFixture) volumeStorage(path string) agr.VolumeStorage {
+	if f.storageType == agr.VolumeStorageCOS {
+		return agr.VolumeStorage{COS: &agr.VolumeCOSStorage{Endpoint: f.cosEndpoint, BucketName: f.cosBucket, BucketPath: path}}
+	}
+	return agr.VolumeStorage{CFS: &agr.VolumeCFSStorage{FileSystemID: f.fileSystemID, Path: "/" + path}}
+}
+
+func (f volumeFixture) volumeTemplateStorage(pattern string) agr.VolumeTemplateStorage {
+	if f.storageType == agr.VolumeStorageCOS {
+		return agr.VolumeTemplateStorage{COS: &agr.VolumeTemplateCOSStorage{Endpoint: f.cosEndpoint, BucketName: f.cosBucket, BucketPathPattern: pattern}}
+	}
+	return agr.VolumeTemplateStorage{CFS: &agr.VolumeTemplateCFSStorage{FileSystemID: f.fileSystemID, PathPattern: "/" + pattern}}
 }
 
 func deleteSandbox(sandbox *agr.Sandbox) {

@@ -43,6 +43,9 @@ type a1CloudEnvironment struct {
 
 type volumeCloudEnvironment struct {
 	cloudEnvironment
+	storageType    agr.VolumeStorageType
+	cosEndpoint    string
+	cosBucket      string
 	fileSystemID   string
 	toolType       agr.ToolType
 	toolRoleARN    string
@@ -106,14 +109,31 @@ func requireVolumeCloudEnvironment(t *testing.T) volumeCloudEnvironment {
 	if os.Getenv("AGS_E2E") != "1" {
 		t.Fatal("real persistent Volume E2E requires AGS_E2E=1")
 	}
-	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY", "AGR_VOLUME_CFS_FILESYSTEM_ID", "AGR_VOLUME_TOOL_TYPE"} {
+	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY", "AGR_VOLUME_TOOL_TYPE"} {
 		if os.Getenv(name) == "" {
 			t.Fatalf("real persistent Volume E2E requires %s", name)
 		}
 	}
+	cosEndpoint := os.Getenv("AGR_VOLUME_COS_ENDPOINT")
+	cosBucket := os.Getenv("AGR_VOLUME_COS_BUCKET")
+	fileSystemID := os.Getenv("AGR_VOLUME_CFS_FILESYSTEM_ID")
+	if (cosEndpoint == "") != (cosBucket == "") {
+		t.Fatal("real persistent Volume E2E requires AGR_VOLUME_COS_ENDPOINT and AGR_VOLUME_COS_BUCKET together")
+	}
+	hasCOS, hasCFS := cosEndpoint != "", fileSystemID != ""
+	if hasCOS == hasCFS {
+		t.Fatal("real persistent Volume E2E requires exactly one COS or CFS fixture")
+	}
+	storageType := agr.VolumeStorageCFS
+	if hasCOS {
+		storageType = agr.VolumeStorageCOS
+	}
 	return volumeCloudEnvironment{
 		cloudEnvironment: cloudEnvironment{region: "ap-guangzhou"},
-		fileSystemID:     os.Getenv("AGR_VOLUME_CFS_FILESYSTEM_ID"),
+		storageType:      storageType,
+		cosEndpoint:      cosEndpoint,
+		cosBucket:        cosBucket,
+		fileSystemID:     fileSystemID,
 		toolType:         agr.ToolType(os.Getenv("AGR_VOLUME_TOOL_TYPE")),
 		toolRoleARN:      os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
 		storageRoleARN:   os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),

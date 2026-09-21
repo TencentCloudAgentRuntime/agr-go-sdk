@@ -23,7 +23,7 @@ Cloud endpoint for an authorized test environment; omit it for the public endpoi
 
 The suite is serial (`-p=1`). Each stable journey creates at most five Sandboxes, one uniquely
 named Tool, and one uniquely named Deployment. The Preview persistent-Volume journey creates one
-additional bootstrap Tool/Sandbox to initialize and later remove its dedicated CFS subpath. Every
+additional bootstrap Tool/Sandbox to initialize and later remove its dedicated COS prefix or CFS subpath. Every
 journey registers independent cleanup for each accepted creation. Cleanup sends Delete and polls
 until the control plane reports
 `STOPPED` or `NOT_FOUND`. A failed cleanup fails the test. Do not run it against a shared Tool
@@ -64,24 +64,31 @@ The minimal environment for that command is `AGS_E2E=1`, the two Tencent Cloud s
 `AGS_E2E_REGION`, `AGS_E2E_PRECACHE_IMAGE`, and `AGS_E2E_PRECACHE_REGISTRY_TYPE`.
 
 The Preview persistent-Volume journey always runs in `ap-guangzhou`; it does not use
-`AGS_E2E_REGION`. Its additional fixture variables are:
+`AGS_E2E_REGION`. Configure exactly one reviewed storage fixture:
 
 ```bash
-export AGR_VOLUME_CFS_FILESYSTEM_ID=... # reviewed ap-guangzhou CFS fixture; never deleted by the test
-export AGR_VOLUME_TOOL_TYPE=...         # envd-capable Tool type supported by the fixture
-export AGR_VOLUME_TOOL_ROLE_ARN=...     # optional, when Tool mounts require a role
-export AGR_VOLUME_STORAGE_ROLE_ARN=...  # optional, when CFS access requires a storage role
+# COS option
+export AGR_VOLUME_COS_ENDPOINT=cos.ap-guangzhou.myqcloud.com
+export AGR_VOLUME_COS_BUCKET=...         # reviewed Bucket; never deleted by the test
+
+# CFS option instead of COS
+export AGR_VOLUME_CFS_FILESYSTEM_ID=...  # reviewed ap-guangzhou CFS; never deleted by the test
+
+export AGR_VOLUME_TOOL_TYPE=...          # envd-capable Tool type supported by the fixture
+export AGR_VOLUME_TOOL_ROLE_ARN=...      # optional, when Tool mounts require a role
+export AGR_VOLUME_STORAGE_ROLE_ARN=...   # optional, when storage access requires a role
 cd test
 go test -v -count=1 -run '^TestPersistentVolumeCloudJourney$' .
 ```
 
 The test records the initial Volume and VolumeTemplate ID sets, creates only uniquely named
-resources under `/agr-sdk-e2e/<run-id>`, and cleans up in dependency order. A bootstrap mount of
-the CFS root creates that unique subpath before Volume creation and removes only that subpath at
-the end. The test deletes Sandboxes, its Tools, derived and standalone Volumes, and then its
-VolumeTemplates; it never deletes the CFS file system or reuses an unreviewed account resource.
-The CFS fixture must belong to `ap-guangzhou`; a cross-region file-system ID is invalid. Missing fixture variables fail before any
-network request instead of selecting an existing resource from List.
+resources under `agr-sdk-e2e/<run-id>`, and cleans up in dependency order. A bootstrap mount
+creates that unique COS prefix or CFS subpath before Volume creation and removes only its contents
+at the end. The test deletes Sandboxes, its Tools, derived and standalone Volumes, and then its
+VolumeTemplates; it never deletes the Bucket or CFS file system and never reuses an unreviewed
+account resource. The fixture must belong to `ap-guangzhou`; cross-region storage is invalid.
+Missing or ambiguous fixture variables fail before any network request instead of selecting an
+existing resource from List.
 
 The explicit-client journey covers Files, streamed upload/read, Watch, Commands Run/List/Connect,
 PTY, all ten Metrics with an explicit Start/End window, Update, and Connect. A dedicated
