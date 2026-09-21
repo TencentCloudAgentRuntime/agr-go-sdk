@@ -67,7 +67,7 @@ The Preview persistent-Volume journey always runs in `ap-guangzhou`; it does not
 `AGS_E2E_REGION`. Its additional fixture variables are:
 
 ```bash
-export AGR_VOLUME_CFS_FILESYSTEM_ID=... # reviewed disposable CFS fixture; never deleted by the test
+export AGR_VOLUME_CFS_FILESYSTEM_ID=... # reviewed ap-guangzhou CFS fixture; never deleted by the test
 export AGR_VOLUME_TOOL_TYPE=...         # envd-capable Tool type supported by the fixture
 export AGR_VOLUME_TOOL_ROLE_ARN=...     # optional, when Tool mounts require a role
 export AGR_VOLUME_STORAGE_ROLE_ARN=...  # optional, when CFS access requires a storage role
@@ -80,7 +80,7 @@ resources under `/agr-sdk-e2e/<run-id>`, and cleans up in dependency order. A bo
 the CFS root creates that unique subpath before Volume creation and removes only that subpath at
 the end. The test deletes Sandboxes, its Tools, derived and standalone Volumes, and then its
 VolumeTemplates; it never deletes the CFS file system or reuses an unreviewed account resource.
-Missing fixture variables fail before any
+The CFS fixture must belong to `ap-guangzhou`; a cross-region file-system ID is invalid. Missing fixture variables fail before any
 network request instead of selecting an existing resource from List.
 
 The explicit-client journey covers Files, streamed upload/read, Watch, Commands Run/List/Connect,
