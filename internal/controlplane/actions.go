@@ -12,15 +12,21 @@ const (
 )
 
 var actionRoutes = map[string]ActionRoute{
+	"AcquireDeploymentToken":      OfficialTyped,
 	"StartSandboxInstance":        OfficialTyped,
 	"DescribeSandboxInstanceList": OfficialTyped,
 	"AcquireSandboxInstanceToken": OfficialTyped,
 	"CreatePreCacheImageTask":     OfficialTyped,
+	"CreateDeployment":            OfficialTyped,
 	"CreateSandboxTool":           OfficialTyped,
 	"DeleteSandboxTool":           OfficialTyped,
+	"DeleteDeployment":            OfficialTyped,
+	"DescribeDeployment":          OfficialTyped,
+	"DescribeDeploymentList":      OfficialTyped,
 	"DescribePreCacheImageTask":   OfficialTyped,
 	"DescribeSandboxToolList":     OfficialTyped,
 	"PauseSandboxInstance":        OfficialTyped,
+	"ModifyDeployment":            OfficialTyped,
 	"ResumeSandboxInstance":       OfficialTyped,
 	"StopSandboxInstance":         OfficialTyped,
 	"UpdateSandboxInstance":       OfficialTyped,

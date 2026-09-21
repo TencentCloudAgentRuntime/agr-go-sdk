@@ -69,6 +69,10 @@ func NewClient(opts ...ClientOption) (*Client, error)
     Explicit control credentials are read for each signed request so temporary
     credentials can rotate within one logical Cloud identity.
 
+func (c *Client) Deployments() *DeploymentManager
+    Deployments returns the Deployment control and data-plane service bound to
+    this client.
+
 func (c *Client) PreCacheImages() *PreCacheImageManager
     PreCacheImages returns the image pre-cache service bound to this client's
     Cloud identity.
@@ -95,6 +99,11 @@ func WithCredential(v CloudCredential) ClientOption
 
 func WithCredentialProvider(v CredentialProvider) ClientOption
     WithCredentialProvider selects a concurrent, per-request credential source.
+
+func WithDataPlaneDomain(v string) ClientOption
+    WithDataPlaneDomain selects the base domain used for Deployment data-plane
+    connections. The default is tencentags.com. Pass a hostname only, without a
+    scheme, port, or path.
 
 func WithHTTPClient(v *http.Client) ClientOption
     WithHTTPClient supplies trusted HTTP configuration; nil uses SDK defaults.
@@ -416,6 +425,40 @@ type CreateCodeContextOptions struct {
     CreateCodeContextOptions configures a new context. Empty values default to
     python and /home/user respectively.
 
+type CreateDeploymentLifecycle struct {
+	// IdleTimeoutSeconds is the optional delay before applying IdleAction.
+	IdleTimeoutSeconds *int64
+	// IdleAction is the optional action applied after the idle timeout.
+	IdleAction *DeploymentIdleAction
+}
+    CreateDeploymentLifecycle preserves omitted create-time defaults.
+
+type CreateDeploymentOptions struct {
+	// Name is a unique DNS-1123 Deployment name.
+	Name string
+	// ToolID selects the Sandbox Tool served by this Deployment.
+	ToolID string
+	// Scaling optionally overrides server scaling defaults.
+	Scaling *CreateDeploymentScaling
+	// Lifecycle optionally overrides server idle-policy defaults.
+	Lifecycle *CreateDeploymentLifecycle
+	// Affinity optionally enables managed instance affinity.
+	Affinity *DeploymentAffinity
+	// Tags is the initial complete tag set.
+	Tags []DeploymentTag
+}
+    CreateDeploymentOptions configures one new stable Deployment entry point.
+
+type CreateDeploymentScaling struct {
+	// MinInstances is the optional active-instance lower bound.
+	MinInstances *int64
+	// MaxInstances is the optional active-instance upper bound.
+	MaxInstances *int64
+	// MaxConcurrency is the optional per-instance request or connection lease limit.
+	MaxConcurrency *int64
+}
+    CreateDeploymentScaling preserves omitted create-time defaults.
+
 type CreateOptions struct {
 	// Tool identifies the existing runtime configuration; exactly one ID or Name is required.
 	Tool ToolRef
@@ -499,6 +542,272 @@ type CredentialProvider interface {
     Implementations must support concurrent calls and honor cancellation.
     Refreshing providers own their caching policy; the SDK never caches the
     returned secret.
+
+type DeploymentAffinity struct {
+	// Mode selects affinity behavior; an empty value disables affinity.
+	Mode DeploymentAffinityMode
+	// HeaderName is the application-visible header used to carry affinity IDs.
+	HeaderName string
+}
+    DeploymentAffinity configures or reports connection affinity. Empty Mode
+    disables affinity.
+
+type DeploymentAffinityMode string
+    DeploymentAffinityMode selects how requests reuse managed Sandbox instances.
+
+const (
+	// DeploymentAffinityBestEffort permits reassignment when the previous instance is unavailable.
+	DeploymentAffinityBestEffort DeploymentAffinityMode = "BEST_EFFORT"
+	// DeploymentAffinityStrict rejects the request when the previous instance is unavailable.
+	DeploymentAffinityStrict DeploymentAffinityMode = "STRICT"
+	// DeploymentAffinityExclusive dedicates one instance to one affinity ID without migration.
+	DeploymentAffinityExclusive DeploymentAffinityMode = "EXCLUSIVE"
+)
+type DeploymentConnectOptions struct {
+	// Port is the remote Tool port, in the range 1..65535.
+	Port int
+	// InitialAffinityID resumes one known affinity session. It is rejected when affinity is off.
+	InitialAffinityID string
+}
+    DeploymentConnectOptions selects one Tool port and optional existing
+    affinity session.
+
+func (o DeploymentConnectOptions) GoString() string
+    GoString returns a redacted Go-syntax representation.
+
+func (DeploymentConnectOptions) String() string
+    String returns a redacted representation.
+
+type DeploymentConnection struct {
+	// Has unexported fields.
+}
+    DeploymentConnection owns one remote port connection policy and its local
+    token/affinity state. Close cancels active operations but never deletes the
+    remote Deployment.
+
+func (c *DeploymentConnection) AffinityID() string
+    AffinityID returns the currently discovered affinity ID, or an empty string
+    when unavailable.
+
+func (c *DeploymentConnection) Close() error
+    Close cancels active HTTP, SSE, and WebSocket work without deleting the
+    Deployment.
+
+func (c *DeploymentConnection) DialWebSocket(ctx context.Context, opts DeploymentWebSocketOptions) (*DeploymentWebSocket, error)
+    DialWebSocket opens one managed WebSocket without exposing the underlying
+    third-party type.
+
+func (c *DeploymentConnection) Do(ctx context.Context, request DeploymentRequest) (*http.Response, error)
+    Do sends one request to the fixed Deployment authority. It never retries.
+    For SSE, consume the returned Body incrementally and close it when finished.
+
+type DeploymentFilter struct {
+	// Name is one of deployment-id, deployment-name, deployment-name-like, tool-id, or status.
+	Name string
+	// Values contains one or more exact filter operands.
+	Values []string
+}
+    DeploymentFilter is one server-side list predicate; filters are ANDed and
+    Values are ORed.
+
+type DeploymentIdleAction string
+    DeploymentIdleAction selects what happens to an idle managed Sandbox
+    instance.
+
+const (
+	// DeploymentIdleStop releases an idle managed Sandbox instance.
+	DeploymentIdleStop DeploymentIdleAction = "STOP"
+	// DeploymentIdlePause preserves an idle managed Sandbox instance in paused state.
+	DeploymentIdlePause DeploymentIdleAction = "PAUSE"
+)
+type DeploymentInfo struct {
+	// ID is the stable Deployment identifier.
+	ID string
+	// Name is the immutable Deployment name.
+	Name string
+	// ToolID is the served Sandbox Tool identifier.
+	ToolID string
+	// StatusReason is the safe service summary for DELETE_FAILED.
+	StatusReason string
+	// State is preserved even when newer than this SDK.
+	State DeploymentState
+	// Scaling is the materialized capacity configuration.
+	Scaling DeploymentScaling
+	// Lifecycle is the materialized idle policy.
+	Lifecycle DeploymentLifecycle
+	// Affinity is nil when affinity is disabled.
+	Affinity *DeploymentAffinity
+	// Tags is the complete tag set.
+	Tags []DeploymentTag
+	// CreatedAt is the service creation time.
+	CreatedAt time.Time
+	// UpdatedAt is the latest successful configuration or state update time.
+	UpdatedAt time.Time
+	// RequestID correlates the Cloud response that produced this snapshot. It is empty for
+	// snapshots embedded in a list; use DeploymentPage.RequestID for that request.
+	RequestID string
+}
+    DeploymentInfo is one immutable, fully materialized control-plane snapshot.
+
+type DeploymentLifecycle struct {
+	// IdleTimeoutSeconds is the delay before applying IdleAction.
+	IdleTimeoutSeconds int64
+	// IdleAction is the action applied after the idle timeout.
+	IdleAction DeploymentIdleAction
+}
+    DeploymentLifecycle is the complete materialized idle policy.
+
+type DeploymentListOptions struct {
+	// Offset is the zero-based result offset.
+	Offset int
+	// Limit is the page size from 1 through 200; zero selects 20.
+	Limit int
+	// Filters contains server-side predicates.
+	Filters []DeploymentFilter
+}
+    DeploymentListOptions configures offset-based Deployment listing.
+
+type DeploymentManager struct {
+	// Has unexported fields.
+}
+    DeploymentManager provides Cloud control and managed data-plane connections
+    for Deployments.
+
+func (m *DeploymentManager) Connect(ctx context.Context, id string, opts DeploymentConnectOptions) (*DeploymentConnection, error)
+    Connect verifies an ACTIVE Deployment and returns a lazy managed connection
+    for one Tool port.
+
+func (m *DeploymentManager) Create(ctx context.Context, opts CreateDeploymentOptions) (DeploymentInfo, error)
+    Create creates a Deployment and returns the service-materialized snapshot.
+
+func (m *DeploymentManager) Delete(ctx context.Context, id string) error
+    Delete submits asynchronous deletion. NotFound is idempotent; use
+    WaitDeleted to confirm.
+
+func (m *DeploymentManager) Get(ctx context.Context, id string) (DeploymentInfo, error)
+    Get returns one Deployment by stable ID.
+
+func (m *DeploymentManager) List(ctx context.Context, opts DeploymentListOptions) (DeploymentPage, error)
+    List returns one offset-based page of Deployments.
+
+func (m *DeploymentManager) Update(ctx context.Context, id string, opts UpdateDeploymentOptions) (DeploymentInfo, error)
+    Update replaces the supplied configuration sections and returns the updated
+    snapshot.
+
+func (m *DeploymentManager) WaitDeleted(ctx context.Context, id string) error
+    WaitDeleted polls until Describe returns exact NotFound and rejects
+    DELETE_FAILED.
+
+func (m *DeploymentManager) WaitFor(ctx context.Context, id string, target DeploymentState) (DeploymentInfo, error)
+    WaitFor polls until the Deployment reaches target or the context ends.
+
+type DeploymentMessage struct {
+	// Type identifies text or binary framing.
+	Type DeploymentMessageType
+	// Data is copied at the SDK boundary.
+	Data []byte
+}
+    DeploymentMessage is one SDK-owned WebSocket message value.
+
+type DeploymentMessageType int
+    DeploymentMessageType identifies one supported WebSocket message kind.
+
+const (
+	// DeploymentTextMessage is a UTF-8 WebSocket text message.
+	DeploymentTextMessage DeploymentMessageType = 1
+	// DeploymentBinaryMessage is an opaque WebSocket binary message.
+	DeploymentBinaryMessage DeploymentMessageType = 2
+)
+type DeploymentPage struct {
+	// Items contains the current page.
+	Items []DeploymentInfo
+	// TotalCount is the filtered count before pagination.
+	TotalCount int64
+	// NextOffset is present when another page may exist.
+	NextOffset *int
+	// RequestID correlates the list request.
+	RequestID string
+}
+    DeploymentPage is one immutable page of Deployment snapshots.
+
+type DeploymentRequest struct {
+	// Method is the HTTP method.
+	Method string
+	// Path is an absolute-path reference and may include a query string.
+	Path string
+	// Header contains business headers and is copied before SDK headers are applied.
+	Header http.Header
+	// Body is the optional streaming request body.
+	Body io.Reader
+}
+    DeploymentRequest is one relative request sent to the fixed Deployment
+    authority.
+
+func (r DeploymentRequest) GoString() string
+    GoString returns a redacted Go-syntax representation.
+
+func (DeploymentRequest) String() string
+    String returns a redacted representation.
+
+type DeploymentScaling struct {
+	// MinInstances is the active-instance lower bound.
+	MinInstances int64
+	// MaxInstances is the active-instance upper bound.
+	MaxInstances int64
+	// MaxConcurrency is the per-instance request or connection lease limit.
+	MaxConcurrency int64
+}
+    DeploymentScaling is the complete materialized capacity configuration.
+
+type DeploymentState string
+    DeploymentState preserves service states, including values added after this
+    SDK release.
+
+const (
+	// DeploymentActive means the stable entry point accepts data-plane traffic.
+	DeploymentActive DeploymentState = "ACTIVE"
+	// DeploymentDeleting means the entry point is closed while deletion is in progress.
+	DeploymentDeleting DeploymentState = "DELETING"
+	// DeploymentDeleteFailed means the last asynchronous deletion attempt failed.
+	DeploymentDeleteFailed DeploymentState = "DELETE_FAILED"
+)
+type DeploymentTag struct {
+	// Key is the tag key.
+	Key string
+	// Value is the tag value.
+	Value string
+}
+    DeploymentTag is one complete Deployment tag pair.
+
+type DeploymentWebSocket struct {
+	// Has unexported fields.
+}
+    DeploymentWebSocket is the SDK-owned, context-aware WebSocket handle.
+
+func (w *DeploymentWebSocket) Close() error
+    Close closes the local WebSocket handle.
+
+func (w *DeploymentWebSocket) Read(ctx context.Context) (DeploymentMessage, error)
+    Read waits for one WebSocket message or context cancellation.
+
+func (w *DeploymentWebSocket) Write(ctx context.Context, message DeploymentMessage) error
+    Write sends one text or binary WebSocket message or stops on context
+    cancellation.
+
+type DeploymentWebSocketOptions struct {
+	// Path is an absolute-path reference and may include a query string.
+	Path string
+	// Header contains business handshake headers and is copied before SDK headers are applied.
+	Header http.Header
+}
+    DeploymentWebSocketOptions configures one WebSocket handshake on the fixed
+    authority.
+
+func (o DeploymentWebSocketOptions) GoString() string
+    GoString returns a redacted Go-syntax representation.
+
+func (DeploymentWebSocketOptions) String() string
+    String returns a redacted representation.
 
 type EnvironmentCredentials struct{}
     EnvironmentCredentials reads TENCENTCLOUD_SECRET_ID,
@@ -1799,6 +2108,17 @@ type UnavailableMetric struct {
 	RequestID string
 }
     UnavailableMetric describes one failed series in a partial Metrics result.
+
+type UpdateDeploymentOptions struct {
+	// Scaling replaces all scaling fields when non-nil.
+	Scaling *DeploymentScaling
+	// Lifecycle replaces all lifecycle fields when non-nil.
+	Lifecycle *DeploymentLifecycle
+	// Tags replaces the complete set; a non-nil empty slice clears all tags.
+	Tags *[]DeploymentTag
+}
+    UpdateDeploymentOptions contains complete replacement sections for one
+    Deployment.
 
 type UpdateOptions struct {
 	// Timeout requests a lifetime of 300..86400 whole seconds. Nil

@@ -8,12 +8,24 @@
   "source_schema_sha256": "d09e09e9a53ef59521c36f7c3cd5eeb78ce4aef64b0832ba4862abe82a183744",
   "source_patch_sha256": "56544a0b5b4a14c59a1caedfc74d9486358fd42e6868d95f15e2a33b4ed09ef0",
   "source_effective_sha256": "32519794cc2df4c7515f1fd223515735135480dedb4408cd8fe9669e911bab88",
-  "sdk_effective_sha256": "9568a8d90a9ca009686c28c3fcb65e26f7603937d27cf8e6d87409de5b04e7c1",
-  "sdk_effective_actions": 13,
-  "sdk_effective_objects": 54,
+  "sdk_effective_sha256": "1017daeeae638bcb7254d51694b6e877b42062f06bcef302dcbad7a891232cb7",
+  "sdk_effective_actions": 19,
+  "sdk_effective_objects": 70,
   "field_maturity_default": "stable",
   "preview_fields": [],
   "actions": [
+    {
+      "name": "AcquireDeploymentToken",
+      "resource": "deployment",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "AcquireDeploymentTokenRequest",
+      "response": "AcquireDeploymentTokenResponse",
+      "objects": [
+        "AcquireDeploymentTokenRequest",
+        "AcquireDeploymentTokenResponse"
+      ]
+    },
     {
       "name": "AcquireSandboxInstanceToken",
       "resource": "sandbox",
@@ -24,6 +36,23 @@
       "objects": [
         "AcquireSandboxInstanceTokenRequest",
         "AcquireSandboxInstanceTokenResponse"
+      ]
+    },
+    {
+      "name": "CreateDeployment",
+      "resource": "deployment",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "CreateDeploymentRequest",
+      "response": "CreateDeploymentResponse",
+      "objects": [
+        "AffinityConfiguration",
+        "CreateDeploymentRequest",
+        "CreateDeploymentResponse",
+        "Deployment",
+        "LifecycleConfiguration",
+        "ScalingConfiguration",
+        "Tag"
       ]
     },
     {
@@ -73,6 +102,18 @@
       ]
     },
     {
+      "name": "DeleteDeployment",
+      "resource": "deployment",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DeleteDeploymentRequest",
+      "response": "DeleteDeploymentResponse",
+      "objects": [
+        "DeleteDeploymentRequest",
+        "DeleteDeploymentResponse"
+      ]
+    },
+    {
       "name": "DeleteSandboxTool",
       "resource": "tool",
       "maturity": "stable",
@@ -82,6 +123,41 @@
       "objects": [
         "DeleteSandboxToolRequest",
         "DeleteSandboxToolResponse"
+      ]
+    },
+    {
+      "name": "DescribeDeployment",
+      "resource": "deployment",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DescribeDeploymentRequest",
+      "response": "DescribeDeploymentResponse",
+      "objects": [
+        "AffinityConfiguration",
+        "Deployment",
+        "DescribeDeploymentRequest",
+        "DescribeDeploymentResponse",
+        "LifecycleConfiguration",
+        "ScalingConfiguration",
+        "Tag"
+      ]
+    },
+    {
+      "name": "DescribeDeploymentList",
+      "resource": "deployment",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "DescribeDeploymentListRequest",
+      "response": "DescribeDeploymentListResponse",
+      "objects": [
+        "AffinityConfiguration",
+        "Deployment",
+        "DescribeDeploymentListRequest",
+        "DescribeDeploymentListResponse",
+        "Filter",
+        "LifecycleConfiguration",
+        "ScalingConfiguration",
+        "Tag"
       ]
     },
     {
@@ -156,6 +232,23 @@
         "Tag",
         "VPCConfig",
         "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "ModifyDeployment",
+      "resource": "deployment",
+      "maturity": "stable",
+      "route": "official_typed",
+      "request": "ModifyDeploymentRequest",
+      "response": "ModifyDeploymentResponse",
+      "objects": [
+        "AffinityConfiguration",
+        "Deployment",
+        "LifecycleConfiguration",
+        "ModifyDeploymentRequest",
+        "ModifyDeploymentResponse",
+        "ScalingConfiguration",
+        "Tag"
       ]
     },
     {

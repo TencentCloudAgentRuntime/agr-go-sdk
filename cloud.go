@@ -197,6 +197,115 @@ func (c *controlAdapter) GetPreCacheImage(ctx context.Context, ref PreCacheImage
 	return PreCacheImageInfo{Ref: preCacheRefFrom(out.Ref), Status: out.Status, Message: out.Message, RequestID: out.RequestID}, nil
 }
 
+func (c *controlAdapter) CreateDeployment(ctx context.Context, opts CreateDeploymentOptions) (DeploymentInfo, error) {
+	out, err := c.service.CreateDeployment(ctx, controlCreateDeployment(opts))
+	if err != nil {
+		return DeploymentInfo{}, normalizeError("Deployments.Create", err)
+	}
+	return deploymentInfoFrom(out), nil
+}
+
+func (c *controlAdapter) GetDeployment(ctx context.Context, id string) (DeploymentInfo, error) {
+	out, err := c.service.GetDeployment(ctx, id)
+	if err != nil {
+		return DeploymentInfo{}, withResourceError(normalizeError("Deployments.Get", err), "deployment", id)
+	}
+	return deploymentInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListDeployments(ctx context.Context, opts DeploymentListOptions) (DeploymentPage, error) {
+	in := controlplane.DeploymentListRequest{Offset: opts.Offset, Limit: opts.Limit}
+	for _, filter := range opts.Filters {
+		in.Filters = append(in.Filters, controlplane.DeploymentFilter{Name: filter.Name, Values: filter.Values})
+	}
+	out, err := c.service.ListDeployments(ctx, in)
+	if err != nil {
+		return DeploymentPage{}, normalizeError("Deployments.List", err)
+	}
+	page := DeploymentPage{TotalCount: out.TotalCount, RequestID: out.RequestID, Items: make([]DeploymentInfo, 0, len(out.Items))}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, deploymentInfoFrom(controlplane.DeploymentResult{Deployment: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateDeployment(ctx context.Context, id string, opts UpdateDeploymentOptions) (DeploymentInfo, error) {
+	out, err := c.service.UpdateDeployment(ctx, id, controlUpdateDeployment(opts))
+	if err != nil {
+		return DeploymentInfo{}, withResourceError(normalizeError("Deployments.Update", err), "deployment", id)
+	}
+	return deploymentInfoFrom(out), nil
+}
+
+func (c *controlAdapter) DeleteDeployment(ctx context.Context, id string) error {
+	return withResourceError(normalizeError("Deployments.Delete", c.service.DeleteDeployment(ctx, id)), "deployment", id)
+}
+
+func (c *controlAdapter) acquireDeploymentToken(ctx context.Context, id string) (deploymentAccess, error) {
+	out, err := c.service.AcquireDeploymentToken(ctx, id)
+	if err != nil {
+		return deploymentAccess{}, withResourceError(normalizeError("Deployments.Connect", err), "deployment", id)
+	}
+	return deploymentAccess{token: out.Token, expiresAt: out.ExpiresAt}, nil
+}
+
+func controlCreateDeployment(value CreateDeploymentOptions) controlplane.CreateDeploymentRequest {
+	out := controlplane.CreateDeploymentRequest{Name: value.Name, ToolID: value.ToolID}
+	if value.Scaling != nil {
+		out.Scaling = &controlplane.DeploymentScalingInput{MinInstances: value.Scaling.MinInstances, MaxInstances: value.Scaling.MaxInstances, MaxConcurrency: value.Scaling.MaxConcurrency}
+	}
+	if value.Lifecycle != nil {
+		out.Lifecycle = &controlplane.DeploymentLifecycleInput{IdleTimeoutSeconds: value.Lifecycle.IdleTimeoutSeconds}
+		if value.Lifecycle.IdleAction != nil {
+			action := string(*value.Lifecycle.IdleAction)
+			out.Lifecycle.IdleAction = &action
+		}
+	}
+	if value.Affinity != nil {
+		out.Affinity = &controlplane.DeploymentAffinityInput{Mode: string(value.Affinity.Mode), HeaderName: value.Affinity.HeaderName}
+	}
+	for _, tag := range value.Tags {
+		out.Tags = append(out.Tags, controlplane.DeploymentTag{Key: tag.Key, Value: tag.Value})
+	}
+	return out
+}
+
+func controlUpdateDeployment(value UpdateDeploymentOptions) controlplane.UpdateDeploymentRequest {
+	out := controlplane.UpdateDeploymentRequest{}
+	if value.Scaling != nil {
+		min, max, concurrency := value.Scaling.MinInstances, value.Scaling.MaxInstances, value.Scaling.MaxConcurrency
+		out.Scaling = &controlplane.DeploymentScalingInput{MinInstances: &min, MaxInstances: &max, MaxConcurrency: &concurrency}
+	}
+	if value.Lifecycle != nil {
+		timeout, action := value.Lifecycle.IdleTimeoutSeconds, string(value.Lifecycle.IdleAction)
+		out.Lifecycle = &controlplane.DeploymentLifecycleInput{IdleTimeoutSeconds: &timeout, IdleAction: &action}
+	}
+	if value.Tags != nil {
+		tags := make([]controlplane.DeploymentTag, 0, len(*value.Tags))
+		for _, tag := range *value.Tags {
+			tags = append(tags, controlplane.DeploymentTag{Key: tag.Key, Value: tag.Value})
+		}
+		out.Tags = &tags
+	}
+	return out
+}
+
+func deploymentInfoFrom(value controlplane.DeploymentResult) DeploymentInfo {
+	in := value.Deployment
+	out := DeploymentInfo{ID: in.ID, Name: in.Name, ToolID: in.ToolID, State: DeploymentState(in.State), StatusReason: in.StatusReason, Scaling: DeploymentScaling{MinInstances: in.Scaling.MinInstances, MaxInstances: in.Scaling.MaxInstances, MaxConcurrency: in.Scaling.MaxConcurrency}, Lifecycle: DeploymentLifecycle{IdleTimeoutSeconds: in.Lifecycle.IdleTimeoutSeconds, IdleAction: DeploymentIdleAction(in.Lifecycle.IdleAction)}, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt, RequestID: value.RequestID}
+	if in.Affinity != nil {
+		out.Affinity = &DeploymentAffinity{Mode: DeploymentAffinityMode(in.Affinity.Mode), HeaderName: in.Affinity.HeaderName}
+	}
+	for _, tag := range in.Tags {
+		out.Tags = append(out.Tags, DeploymentTag{Key: tag.Key, Value: tag.Value})
+	}
+	return out
+}
+
 func controlCreateTool(value CreateToolOptions) controlplane.CreateToolRequest {
 	out := controlplane.CreateToolRequest{Name: value.Name, Type: string(value.Type), Description: value.Description, DefaultTimeout: value.DefaultTimeout, ClientToken: value.ClientToken, RoleARN: value.RoleARN, Network: controlToolNetwork(value.Network), Persistent: value.Persistent}
 	for _, tag := range value.Tags {

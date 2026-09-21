@@ -22,6 +22,7 @@ type clientConfig struct {
 	monitor         monitorTransport
 	controlEndpoint string
 	monitorEndpoint string
+	dataPlaneDomain string
 	httpClient      *http.Client
 }
 
@@ -64,6 +65,12 @@ func WithMonitorEndpoint(v string) ClientOption {
 	return func(c *clientConfig) { c.monitorEndpoint = v }
 }
 
+// WithDataPlaneDomain selects the base domain used for Deployment data-plane connections.
+// The default is tencentags.com. Pass a hostname only, without a scheme, port, or path.
+func WithDataPlaneDomain(v string) ClientOption {
+	return func(c *clientConfig) { c.dataPlaneDomain = v }
+}
+
 // WithHTTPClient supplies trusted HTTP configuration; nil uses SDK defaults. The SDK rejects
 // redirects and reuses the transport without taking ownership of the shared client. Do not log
 // or forward credentials in custom transports.
@@ -90,6 +97,7 @@ type Client struct {
 	sandboxes      *SandboxManager
 	tools          *ToolManager
 	preCacheImages *PreCacheImageManager
+	deployments    *DeploymentManager
 }
 
 // Sandboxes returns the sandbox control service bound to this client's Cloud identity.
@@ -101,12 +109,15 @@ func (c *Client) Tools() *ToolManager { return c.tools }
 // PreCacheImages returns the image pre-cache service bound to this client's Cloud identity.
 func (c *Client) PreCacheImages() *PreCacheImageManager { return c.preCacheImages }
 
+// Deployments returns the Deployment control and data-plane service bound to this client.
+func (c *Client) Deployments() *DeploymentManager { return c.deployments }
+
 // NewClient constructs a client without creating a sandbox. Region defaults from
 // TENCENTCLOUD_REGION; request timeout defaults to 30 seconds. Explicit control credentials
 // are read for each signed request so temporary credentials can rotate within one logical
 // Cloud identity.
 func NewClient(opts ...ClientOption) (*Client, error) {
-	c := clientConfig{region: os.Getenv("TENCENTCLOUD_REGION"), credential: EnvironmentCredentials{}, timeout: 30 * time.Second, controlEndpoint: "ags.tencentcloudapi.com", monitorEndpoint: "monitor.tencentcloudapi.com"}
+	c := clientConfig{region: os.Getenv("TENCENTCLOUD_REGION"), credential: EnvironmentCredentials{}, timeout: 30 * time.Second, controlEndpoint: "ags.tencentcloudapi.com", monitorEndpoint: "monitor.tencentcloudapi.com", dataPlaneDomain: "tencentags.com"}
 	for _, opt := range opts {
 		if opt == nil {
 			return nil, codeError(InvalidArgument, "NewClient", "OPTION_REQUIRED")
@@ -118,6 +129,9 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 	if c.timeout <= 0 {
 		return nil, codeError(InvalidArgument, "NewClient", "TIMEOUT_OUT_OF_RANGE")
+	}
+	if !validDataPlaneDomain(c.dataPlaneDomain) {
+		return nil, codeError(InvalidArgument, "NewClient", "DATA_PLANE_DOMAIN_INVALID")
 	}
 	c.httpClient = noRedirectClient(c.httpClient)
 	if c.credential == nil {
@@ -137,7 +151,14 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	out.sandboxes = &SandboxManager{client: out}
 	out.tools = &ToolManager{client: out}
 	out.preCacheImages = &PreCacheImageManager{client: out}
+	out.deployments = &DeploymentManager{client: out}
 	return out, nil
+}
+
+var dataPlaneDomainPattern = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+
+func validDataPlaneDomain(value string) bool {
+	return len(value) > 0 && len(value) <= 253 && dataPlaneDomainPattern.MatchString(value)
 }
 
 // SandboxManager provides control-plane operations and returns the same Sandbox type as the

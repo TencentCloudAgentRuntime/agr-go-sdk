@@ -3,7 +3,9 @@ package e2e_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,10 +18,40 @@ type cloudEnvironment struct {
 	codeToolID string
 }
 
+func errorTypeChain(err error) string {
+	var types []string
+	for err != nil && len(types) < 8 {
+		types = append(types, fmt.Sprintf("%T", err))
+		err = errors.Unwrap(err)
+	}
+	return strings.Join(types, " -> ")
+}
+
+func cloudErrorCode(err error) string {
+	var coded interface{ GetCode() string }
+	if errors.As(err, &coded) {
+		return coded.GetCode()
+	}
+	return ""
+}
+
 type a1CloudEnvironment struct {
 	cloudEnvironment
 	preCacheImage        string
 	preCacheRegistryType agr.ImageRegistryType
+}
+
+func requireDeploymentEnvironment(t *testing.T) cloudEnvironment {
+	t.Helper()
+	if os.Getenv("AGS_E2E") != "1" {
+		t.Fatal("real Deployment E2E requires AGS_E2E=1")
+	}
+	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY", "AGS_E2E_REGION", "AGS_E2E_TOOL_ID"} {
+		if os.Getenv(name) == "" {
+			t.Fatalf("real Deployment E2E requires %s", name)
+		}
+	}
+	return cloudEnvironment{region: os.Getenv("AGS_E2E_REGION"), toolID: os.Getenv("AGS_E2E_TOOL_ID")}
 }
 
 func requireCloudEnvironment(t *testing.T) cloudEnvironment {
@@ -60,7 +92,11 @@ func requireA1CloudEnvironment(t *testing.T) a1CloudEnvironment {
 
 func newCloudClient(t *testing.T, environment cloudEnvironment) *agr.Client {
 	t.Helper()
-	client, err := agr.NewClient(agr.WithRegion(environment.region))
+	options := []agr.ClientOption{agr.WithRegion(environment.region)}
+	if endpoint := os.Getenv("AGS_E2E_CONTROL_ENDPOINT"); endpoint != "" {
+		options = append(options, agr.WithControlPlaneEndpoint(endpoint))
+	}
+	client, err := agr.NewClient(options...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,5 +175,18 @@ func deleteToolAndConfirm(t *testing.T, manager *agr.ToolManager, id string) {
 			return
 		case <-ticker.C:
 		}
+	}
+}
+
+func deleteDeploymentAndConfirm(t *testing.T, manager *agr.DeploymentManager, id string) {
+	t.Helper()
+	cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := manager.Delete(cleanup, id); err != nil {
+		t.Errorf("delete Deployment: %v", err)
+		return
+	}
+	if err := manager.WaitDeleted(cleanup, id); err != nil {
+		t.Errorf("confirm Deployment cleanup: %v", err)
 	}
 }

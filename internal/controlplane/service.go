@@ -378,6 +378,8 @@ func cloudError(err error, operation string) error {
 			code, reason = model.ResourceExhausted, "REQUEST_LIMIT_EXCEEDED"
 		case strings.Contains(value, "invalidparameter") || strings.Contains(value, "missingparameter"):
 			code, reason, retryable = model.InvalidArgument, "CLOUD_INVALID_ARGUMENT", false
+		case strings.Contains(value, "unsupportedregion"):
+			code, reason, retryable = model.InvalidArgument, "CLOUD_UNSUPPORTED_REGION", false
 		case strings.Contains(value, "malformedresponse"):
 			code, reason, retryable = model.Protocol, "CLOUD_RESPONSE_MALFORMED", false
 		}

@@ -274,6 +274,153 @@ func (a *AGS) AcquireToken(ctx context.Context, id string) (string, error) {
 	return valueString(response.Response.Token), nil
 }
 
+func (a *AGS) CreateDeployment(ctx context.Context, in CreateDeploymentRequest) (DeploymentResult, error) {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return DeploymentResult{}, err
+	}
+	defer cancel()
+	req := ags.NewCreateDeploymentRequest()
+	req.DeploymentName, req.ToolId = stringPtr(in.Name), stringPtr(in.ToolID)
+	req.ScalingConfiguration = deploymentScalingInput(in.Scaling)
+	req.LifecycleConfiguration = deploymentLifecycleInput(in.Lifecycle)
+	req.AffinityConfiguration = deploymentAffinityInput(in.Affinity)
+	req.Tags = deploymentTags(in.Tags)
+	response, err := client.CreateDeploymentWithContext(callCtx, req)
+	if err != nil {
+		return DeploymentResult{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil || response.Response.Deployment == nil {
+		return DeploymentResult{}, malformedDeploymentResponse("CreateDeployment", "response has no Deployment")
+	}
+	value, err := deploymentFrom(response.Response.Deployment)
+	return DeploymentResult{Deployment: value, RequestID: valueString(response.Response.RequestId)}, err
+}
+
+func (a *AGS) GetDeployment(ctx context.Context, id string) (DeploymentResult, error) {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return DeploymentResult{}, err
+	}
+	defer cancel()
+	req := ags.NewDescribeDeploymentRequest()
+	req.DeploymentId = &id
+	response, err := client.DescribeDeploymentWithContext(callCtx, req)
+	if err != nil {
+		return DeploymentResult{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil || response.Response.Deployment == nil {
+		return DeploymentResult{}, malformedDeploymentResponse("DescribeDeployment", "response has no Deployment")
+	}
+	value, err := deploymentFrom(response.Response.Deployment)
+	return DeploymentResult{Deployment: value, RequestID: valueString(response.Response.RequestId)}, err
+}
+
+func (a *AGS) ListDeployments(ctx context.Context, in DeploymentListRequest) (DeploymentPage, error) {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return DeploymentPage{}, err
+	}
+	defer cancel()
+	req := ags.NewDescribeDeploymentListRequest()
+	offset, limit := int64(in.Offset), int64(in.Limit)
+	req.Offset, req.Limit = &offset, &limit
+	for _, filter := range in.Filters {
+		item := &ags.Filter{Name: stringPtr(filter.Name)}
+		for _, value := range filter.Values {
+			value := value
+			item.Values = append(item.Values, &value)
+		}
+		req.Filters = append(req.Filters, item)
+	}
+	response, err := client.DescribeDeploymentListWithContext(callCtx, req)
+	if err != nil {
+		return DeploymentPage{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil {
+		return DeploymentPage{}, malformedDeploymentResponse("DescribeDeploymentList", "response is empty")
+	}
+	out := DeploymentPage{TotalCount: valueInt64(response.Response.TotalCount), RequestID: valueString(response.Response.RequestId)}
+	for _, item := range response.Response.DeploymentSet {
+		if item == nil {
+			continue
+		}
+		value, err := deploymentFrom(item)
+		if err != nil {
+			return DeploymentPage{}, err
+		}
+		out.Items = append(out.Items, value)
+	}
+	return out, nil
+}
+
+func (a *AGS) UpdateDeployment(ctx context.Context, id string, in UpdateDeploymentRequest) (DeploymentResult, error) {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return DeploymentResult{}, err
+	}
+	defer cancel()
+	req := ags.NewModifyDeploymentRequest()
+	req.DeploymentId = &id
+	req.ScalingConfiguration = deploymentScalingInput(in.Scaling)
+	req.LifecycleConfiguration = deploymentLifecycleInput(in.Lifecycle)
+	if in.Tags != nil {
+		req.Tags = deploymentTags(*in.Tags)
+		if req.Tags == nil {
+			req.Tags = []*ags.Tag{}
+		}
+	}
+	response, err := client.ModifyDeploymentWithContext(callCtx, req)
+	if err != nil {
+		return DeploymentResult{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil || response.Response.Deployment == nil {
+		return DeploymentResult{}, malformedDeploymentResponse("ModifyDeployment", "response has no Deployment")
+	}
+	value, err := deploymentFrom(response.Response.Deployment)
+	return DeploymentResult{Deployment: value, RequestID: valueString(response.Response.RequestId)}, err
+}
+
+func (a *AGS) DeleteDeployment(ctx context.Context, id string) error {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	req := ags.NewDeleteDeploymentRequest()
+	req.DeploymentId = &id
+	response, err := client.DeleteDeploymentWithContext(callCtx, req)
+	if err != nil {
+		return wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil {
+		return malformedDeploymentResponse("DeleteDeployment", "response is empty")
+	}
+	return nil
+}
+
+func (a *AGS) AcquireDeploymentToken(ctx context.Context, id string) (DeploymentToken, error) {
+	client, callCtx, cancel, err := a.client(ctx)
+	if err != nil {
+		return DeploymentToken{}, err
+	}
+	defer cancel()
+	req := ags.NewAcquireDeploymentTokenRequest()
+	req.DeploymentId = &id
+	response, err := client.AcquireDeploymentTokenWithContext(callCtx, req)
+	if err != nil {
+		return DeploymentToken{}, wrapCall(callCtx, err)
+	}
+	if response == nil || response.Response == nil || valueString(response.Response.Token) == "" || valueString(response.Response.ExpiresAt) == "" {
+		return DeploymentToken{}, malformedDeploymentResponse("AcquireDeploymentToken", "response has no token or expiry")
+	}
+	expires, err := time.Parse(time.RFC3339, valueString(response.Response.ExpiresAt))
+	if err != nil {
+		return DeploymentToken{}, malformedDeploymentResponse("AcquireDeploymentToken", "expiry is not RFC3339")
+	}
+	return DeploymentToken{Token: valueString(response.Response.Token), ExpiresAt: expires, RequestID: valueString(response.Response.RequestId)}, nil
+}
+
 func (a *AGS) client(ctx context.Context) (*ags.Client, context.Context, context.CancelFunc, error) {
 	credential, err := a.credential(ctx)
 	if err != nil {

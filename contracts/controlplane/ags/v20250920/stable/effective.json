@@ -1,10 +1,24 @@
 {
   "actions": {
+    "AcquireDeploymentToken": {
+      "document": "获取 Deployment 访问 Token",
+      "input": "AcquireDeploymentTokenRequest",
+      "name": "获取 Deployment Token",
+      "output": "AcquireDeploymentTokenResponse",
+      "status": "online"
+    },
     "AcquireSandboxInstanceToken": {
       "document": "获取访问沙箱工具时所需要使用的访问Token，创建沙箱实例后需调用此接口获取沙箱实例访问Token。\n此Token可用于调用代码沙箱实例执行代码，或浏览器沙箱实例进行浏览器操作等。",
       "input": "AcquireSandboxInstanceTokenRequest",
       "name": "获取沙箱实例的访问Token",
       "output": "AcquireSandboxInstanceTokenResponse",
+      "status": "online"
+    },
+    "CreateDeployment": {
+      "document": "创建 Deployment",
+      "input": "CreateDeploymentRequest",
+      "name": "创建 Deployment",
+      "output": "CreateDeploymentResponse",
       "status": "online"
     },
     "CreatePreCacheImageTask": {
@@ -21,11 +35,32 @@
       "output": "CreateSandboxToolResponse",
       "status": "online"
     },
+    "DeleteDeployment": {
+      "document": "删除 Deployment",
+      "input": "DeleteDeploymentRequest",
+      "name": "删除 Deployment",
+      "output": "DeleteDeploymentResponse",
+      "status": "online"
+    },
     "DeleteSandboxTool": {
       "document": "删除沙箱工具",
       "input": "DeleteSandboxToolRequest",
       "name": "删除沙箱工具",
       "output": "DeleteSandboxToolResponse",
+      "status": "online"
+    },
+    "DescribeDeployment": {
+      "document": "查询 Deployment 信息",
+      "input": "DescribeDeploymentRequest",
+      "name": "查询 Deployment",
+      "output": "DescribeDeploymentResponse",
+      "status": "online"
+    },
+    "DescribeDeploymentList": {
+      "document": "查询 Deployment 列表",
+      "input": "DescribeDeploymentListRequest",
+      "name": "查询 Deployment 列表",
+      "output": "DescribeDeploymentListResponse",
       "status": "online"
     },
     "DescribePreCacheImageTask": {
@@ -47,6 +82,13 @@
       "input": "DescribeSandboxToolListRequest",
       "name": "查询沙箱工具列表",
       "output": "DescribeSandboxToolListResponse",
+      "status": "online"
+    },
+    "ModifyDeployment": {
+      "document": "修改 Deployment",
+      "input": "ModifyDeploymentRequest",
+      "name": "修改 Deployment",
+      "output": "ModifyDeploymentResponse",
       "status": "online"
     },
     "PauseSandboxInstance": {
@@ -99,6 +141,53 @@
     "serviceShortName": "ags"
   },
   "objects": {
+    "AcquireDeploymentTokenRequest": {
+      "document": "AcquireDeploymentToken请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e目标 ACTIVE Deployment 的稳定 ID。\u003c/p\u003e",
+          "example": "dpl-a1b2c3d4",
+          "member": "string",
+          "name": "DeploymentId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "AcquireDeploymentTokenResponse": {
+      "document": "AcquireDeploymentToken返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e只用于目标 Deployment 数据面入口的短期 bearer Token，格式为 dpt_ 加非空、无 padding 的 Base64URL opaque 后缀。\u003c/p\u003e",
+          "example": "dpt_ZXhhbXBsZS10b2tlbg",
+          "member": "string",
+          "name": "Token",
+          "output_required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eToken 的绝对过期时间，UTC、秒精度 RFC3339 格式。\u003c/p\u003e",
+          "example": "2026-08-07T08:00:00Z",
+          "member": "datetime_iso",
+          "name": "ExpiresAt",
+          "output_required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
     "AcquireSandboxInstanceTokenRequest": {
       "document": "AcquireSandboxInstanceToken请求参数结构体",
       "members": [
@@ -155,6 +244,34 @@
         }
       ],
       "type": "object"
+    },
+    "AffinityConfiguration": {
+      "document": "Deployment 对 Sandbox Instance 的亲和配置。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eAffinity 模式。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eBEST_EFFORT：优先复用原 Instance，不可用时允许改选。\u003c/li\u003e\u003cli\u003eSTRICT：只复用原 Instance，不可用时失败且不改选。\u003c/li\u003e\u003cli\u003eEXCLUSIVE：一个 Affinity ID 独占一个 Instance，不能迁移。\u003c/li\u003e\u003c/ul\u003e\u003cp\u003e缺失或空字符串表示关闭 Affinity。\u003c/p\u003e",
+          "example": "EXCLUSIVE",
+          "member": "string",
+          "name": "Mode",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e请求和响应使用的 Affinity Header 名称。必须符合 HTTP field-name token 语法，长度为 1..128 个 ASCII 字节，且不能使用平台保留 Header。\u003c/p\u003e",
+          "example": "X-Tencent-Agr-Affinity-Id",
+          "member": "string",
+          "name": "HeaderName",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "usage": "both"
     },
     "AgentBucketStorageSource": {
       "document": "用于记录 Agent Bucket 的 Storage Source",
@@ -306,6 +423,88 @@
         }
       ],
       "usage": "both"
+    },
+    "CreateDeploymentRequest": {
+      "document": "CreateDeployment请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e唯一的 Deployment 名称，必须符合 DNS-1123 命名规范，创建后不可修改。\u003c/p\u003e",
+          "example": "workspace-service",
+          "member": "string",
+          "name": "DeploymentName",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e用于关联 Sandbox Tool 的标识，格式为 sdt- 加 8 位小写 base36 字符。\u003c/p\u003e",
+          "example": "sdt-a1b2c3d4",
+          "member": "string",
+          "name": "ToolId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e伸缩配置；省略的成员由服务端补全默认值。\u003c/p\u003e",
+          "example": "无",
+          "member": "ScalingConfiguration",
+          "name": "ScalingConfiguration",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e空闲生命周期配置；省略的成员由服务端补全默认值。\u003c/p\u003e",
+          "example": "无",
+          "member": "LifecycleConfiguration",
+          "name": "LifecycleConfiguration",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eAffinity 配置；省略或空 Mode 表示不启用。\u003c/p\u003e",
+          "example": "无",
+          "member": "AffinityConfiguration",
+          "name": "AffinityConfiguration",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "CreateDeploymentResponse": {
+      "document": "CreateDeployment返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e已创建并完成默认值物化的 Deployment。\u003c/p\u003e",
+          "example": "无",
+          "member": "Deployment",
+          "name": "Deployment",
+          "output_required": true,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "type": "string"
+        }
+      ],
+      "type": "object"
     },
     "CreatePreCacheImageTaskRequest": {
       "document": "CreatePreCacheImageTask请求参数结构体",
@@ -778,6 +977,33 @@
       ],
       "usage": "both"
     },
+    "DeleteDeploymentRequest": {
+      "document": "DeleteDeployment请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e待删除的 Deployment ID。\u003c/p\u003e",
+          "example": "dpl-a1b2c3d4",
+          "member": "string",
+          "name": "DeploymentId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DeleteDeploymentResponse": {
+      "document": "DeleteDeployment返回参数结构体",
+      "members": [
+        {
+          "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
     "DeleteSandboxToolRequest": {
       "document": "DeleteSandboxTool请求参数结构体",
       "members": [
@@ -796,6 +1022,235 @@
     "DeleteSandboxToolResponse": {
       "document": "DeleteSandboxTool返回参数结构体",
       "members": [
+        {
+          "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "Deployment": {
+      "document": "Deployment 稳定访问入口定义",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eDeployment 稳定 ID，格式为 dpl- 加 8 位小写 base36 字符。\u003c/p\u003e",
+          "example": "dpl-a1b2c3d4",
+          "member": "string",
+          "name": "DeploymentId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e唯一且创建后不可修改的名称，必须符合 DNS-1123 命名规范。\u003c/p\u003e",
+          "example": "workspace-service",
+          "member": "string",
+          "name": "DeploymentName",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e用于关联 Sandbox Tool 的标识，格式为 sdt- 加 8 位小写 base36 字符。\u003c/p\u003e",
+          "example": "sdt-a1b2c3d4",
+          "member": "string",
+          "name": "ToolId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e完整的活跃容量配置。\u003c/p\u003e",
+          "example": "无",
+          "member": "ScalingConfiguration",
+          "name": "ScalingConfiguration",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e完整的空闲生命周期配置。\u003c/p\u003e",
+          "example": "无",
+          "member": "LifecycleConfiguration",
+          "name": "LifecycleConfiguration",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e可选 Affinity 配置；未启用时省略。\u003c/p\u003e",
+          "example": "无",
+          "member": "AffinityConfiguration",
+          "name": "AffinityConfiguration",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eDeployment 控制面状态。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eACTIVE：入口可用。\u003c/li\u003e\u003cli\u003eDELETING：入口已关闭并正在异步删除。\u003c/li\u003e\u003cli\u003eDELETE_FAILED：最近一次异步删除失败，可再次调用 DeleteDeployment。\u003c/li\u003e\u003c/ul\u003e",
+          "example": "DELETE_FAILED",
+          "member": "string",
+          "name": "Status",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eDELETE_FAILED 状态下 1..1024 个 UTF-8 字节的安全失败摘要，格式为 {Code}[.{SubCode}]: {Message}；其他状态省略。\u003c/p\u003e",
+          "example": "InternalError: internal error",
+          "member": "string",
+          "name": "StatusReason",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e创建时间，UTC、秒精度 RFC3339 格式。\u003c/p\u003e",
+          "example": "2026-08-06T08:00:00Z",
+          "member": "datetime_iso",
+          "name": "CreatedTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e最近一次成功公共配置写入或 Deployment 状态迁移时间，UTC、秒精度 RFC3339 格式。\u003c/p\u003e",
+          "example": "2026-08-06T08:00:00Z",
+          "member": "datetime_iso",
+          "name": "UpdatedTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "output_required": false,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        }
+      ],
+      "usage": "both"
+    },
+    "DescribeDeploymentListRequest": {
+      "document": "DescribeDeploymentList请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e分页偏移量，默认 0，必须大于等于 0。\u003c/p\u003e",
+          "example": "0",
+          "member": "int64",
+          "name": "Offset",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e分页返回数量，默认 20，范围 1..200。\u003c/p\u003e",
+          "example": "20",
+          "member": "int64",
+          "name": "Limit",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e查询过滤条件。\u003c/p\u003e\u003cp\u003eFilter.Name 枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003edeployment-id：按 DeploymentId 精确匹配\u003c/li\u003e\u003cli\u003edeployment-name：按 DeploymentName 精确匹配\u003c/li\u003e\u003cli\u003edeployment-name-like：按 DeploymentName 进行普通文本包含匹配，%、_ 等字符没有通配语义\u003c/li\u003e\u003cli\u003etool-id：按 ToolId 精确匹配\u003c/li\u003e\u003cli\u003estatus：按 Deployment 状态精确匹配，支持 ACTIVE、DELETING、DELETE_FAILED\u003c/li\u003e\u003c/ul\u003e\u003cp\u003e所有匹配均区分大小写。不同 Filter 之间为 AND，同一 Filter 的 Values 之间为 OR。\u003c/p\u003e",
+          "example": "无",
+          "member": "Filter",
+          "name": "Filters",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeDeploymentListResponse": {
+      "document": "DescribeDeploymentList返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e当前页完整 Deployment；无匹配时为空数组。\u003c/p\u003e",
+          "example": "无",
+          "member": "Deployment",
+          "name": "DeploymentSet",
+          "output_required": true,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e应用 Filters 后、分页前的结果总数。\u003c/p\u003e",
+          "example": "1",
+          "member": "int64",
+          "name": "TotalCount",
+          "output_required": true,
+          "type": "int",
+          "value_allowed_null": false
+        },
+        {
+          "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeDeploymentRequest": {
+      "document": "DescribeDeployment请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e待查询的 Deployment ID。\u003c/p\u003e",
+          "example": "dpl-a1b2c3d4",
+          "member": "string",
+          "name": "DeploymentId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeDeploymentResponse": {
+      "document": "DescribeDeployment返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e完整 Deployment。\u003c/p\u003e",
+          "example": "无",
+          "member": "Deployment",
+          "name": "Deployment",
+          "output_required": true,
+          "type": "object",
+          "value_allowed_null": false
+        },
         {
           "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
           "member": "string",
@@ -1239,6 +1694,34 @@
       ],
       "usage": "both"
     },
+    "LifecycleConfiguration": {
+      "document": "Deployment 管理的 Sandbox Instance 的空闲生命周期配置",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eSandbox Instance 没有活跃 Deployment 请求或连接后进入 IdleAction 的秒数，必须大于等于 30。\u003c/p\u003e",
+          "example": "300",
+          "member": "int64",
+          "name": "IdleTimeoutSeconds",
+          "output_required": false,
+          "required": false,
+          "type": "int",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e空闲处理动作。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eSTOP：停止并释放 Sandbox Instance。\u003c/li\u003e\u003cli\u003ePAUSE：暂停并保留 Sandbox Instance 状态。\u003c/li\u003e\u003c/ul\u003e",
+          "example": "STOP",
+          "member": "string",
+          "name": "IdleAction",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "usage": "both"
+    },
     "LogConfiguration": {
       "document": "沙箱工具日志采集相关配置",
       "members": [
@@ -1311,6 +1794,70 @@
         }
       ],
       "usage": "both"
+    },
+    "ModifyDeploymentRequest": {
+      "document": "ModifyDeployment请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e待修改的 Deployment ID。\u003c/p\u003e",
+          "example": "dpl-amfzcemg",
+          "member": "string",
+          "name": "DeploymentId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e完整替换伸缩配置；提供时必须包含全部三个成员。\u003c/p\u003e",
+          "example": "无",
+          "member": "ScalingConfiguration",
+          "name": "ScalingConfiguration",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e完整替换生命周期配置；提供时必须包含全部两个成员。\u003c/p\u003e",
+          "example": "无",
+          "member": "LifecycleConfiguration",
+          "name": "LifecycleConfiguration",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "ModifyDeploymentResponse": {
+      "document": "ModifyDeployment返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e修改后的完整 Deployment。\u003c/p\u003e",
+          "example": "无",
+          "member": "Deployment",
+          "name": "Deployment",
+          "output_required": true,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "唯一请求 ID，由服务端生成，每次请求都会返回（若请求因其他原因未能抵达服务端，则该次请求不会获得 RequestId）。定位问题时需要提供该次请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "type": "string"
+        }
+      ],
+      "type": "object"
     },
     "MountOption": {
       "document": "沙箱实例存储挂载配置可选项，用于覆盖沙箱工具的存储配置的部分选项，并提供子路径挂载配置。",
@@ -2009,6 +2556,45 @@
           "output_required": false,
           "required": false,
           "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "usage": "both"
+    },
+    "ScalingConfiguration": {
+      "document": "Deployment 活跃容量配置",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e活跃 Sandbox Instance 下限，必须大于等于 0。\u003c/p\u003e",
+          "example": "0",
+          "member": "int64",
+          "name": "MinInstanceCount",
+          "output_required": false,
+          "required": false,
+          "type": "int",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e活跃 Sandbox Instance 上限，必须大于等于 1，并且不小于 MinInstanceCount。\u003c/p\u003e",
+          "example": "10",
+          "member": "int64",
+          "name": "MaxInstanceCount",
+          "output_required": false,
+          "required": false,
+          "type": "int",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e每个活跃 Sandbox Instance 同时持有的 Deployment 请求或连接 Lease 上限，必须大于等于 1。\u003c/p\u003e",
+          "example": "100",
+          "member": "int64",
+          "name": "MaxInstanceRequestConcurrency",
+          "output_required": false,
+          "required": false,
+          "type": "int",
           "value_allowed_null": false
         }
       ],
