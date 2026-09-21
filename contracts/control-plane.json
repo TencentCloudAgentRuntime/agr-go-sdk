@@ -8,21 +8,41 @@
     {"name": "CreateDeployment", "resource": "deployment", "maturity": "stable", "route": "official_typed"},
     {"name": "CreatePreCacheImageTask", "resource": "pre_cache_image", "maturity": "stable", "route": "official_typed"},
     {"name": "CreateSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "CreateVolume", "resource": "volume", "maturity": "preview", "route": "common_raw"},
+    {"name": "CreateVolumeTemplate", "resource": "volume_template", "maturity": "preview", "route": "common_raw"},
     {"name": "DeleteDeployment", "resource": "deployment", "maturity": "stable", "route": "official_typed"},
     {"name": "DeleteSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "DeleteVolume", "resource": "volume", "maturity": "preview", "route": "common_raw"},
+    {"name": "DeleteVolumeTemplate", "resource": "volume_template", "maturity": "preview", "route": "common_raw"},
     {"name": "DescribeDeployment", "resource": "deployment", "maturity": "stable", "route": "official_typed"},
     {"name": "DescribeDeploymentList", "resource": "deployment", "maturity": "stable", "route": "official_typed"},
     {"name": "DescribePreCacheImageTask", "resource": "pre_cache_image", "maturity": "stable", "route": "official_typed"},
     {"name": "DescribeSandboxInstanceList", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
     {"name": "DescribeSandboxToolList", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "DescribeVolumeList", "resource": "volume", "maturity": "preview", "route": "common_raw"},
+    {"name": "DescribeVolumeTemplateList", "resource": "volume_template", "maturity": "preview", "route": "common_raw"},
     {"name": "ModifyDeployment", "resource": "deployment", "maturity": "stable", "route": "official_typed"},
     {"name": "PauseSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
     {"name": "ResumeSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
     {"name": "StartSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
     {"name": "StopSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
     {"name": "UpdateSandboxInstance", "resource": "sandbox", "maturity": "stable", "route": "official_typed"},
-    {"name": "UpdateSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"}
+    {"name": "UpdateSandboxTool", "resource": "tool", "maturity": "stable", "route": "official_typed"},
+    {"name": "UpdateVolume", "resource": "volume", "maturity": "preview", "route": "common_raw"},
+    {"name": "UpdateVolumeTemplate", "resource": "volume_template", "maturity": "preview", "route": "common_raw"}
   ],
-  "preview_fields": [],
-  "raw_actions": []
+  "preview_fields": [
+    {"object": "StorageMount", "field": "Volume", "maturity": "preview"},
+    {"object": "StorageMount", "field": "VolumeTemplate", "maturity": "preview"}
+  ],
+  "raw_actions": [
+    "CreateVolume",
+    "CreateVolumeTemplate",
+    "DeleteVolume",
+    "DeleteVolumeTemplate",
+    "DescribeVolumeList",
+    "DescribeVolumeTemplateList",
+    "UpdateVolume",
+    "UpdateVolumeTemplate"
+  ]
 }

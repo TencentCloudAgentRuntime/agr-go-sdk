@@ -53,10 +53,14 @@ func TestOfficialControlPlaneCallsStayInsideActionContract(t *testing.T) {
 	}](t, "contracts/control-plane.json")
 	want := map[string]bool{}
 	for _, action := range contract.Actions {
-		if action.Route != string(controlplane.OfficialTyped) {
-			t.Fatalf("action %s route = %s, typed production scan cannot verify it", action.Name, action.Route)
+		switch action.Route {
+		case string(controlplane.OfficialTyped):
+			want[action.Name] = true
+		case string(controlplane.CommonRaw):
+			// CommonRaw Actions have a separate exact source scan below.
+		default:
+			t.Fatalf("action %s has unknown route %s", action.Name, action.Route)
 		}
-		want[action.Name] = true
 	}
 
 	used := map[string]bool{}
@@ -72,6 +76,33 @@ func TestOfficialControlPlaneCallsStayInsideActionContract(t *testing.T) {
 	}
 	if !reflect.DeepEqual(used, want) {
 		t.Fatalf("official control-plane calls drift: got=%v want=%v", used, want)
+	}
+}
+
+func TestCommonControlPlaneCallsStayInsideActionContract(t *testing.T) {
+	contract := readContract[struct {
+		Actions []struct {
+			Name  string `json:"name"`
+			Route string `json:"route"`
+		} `json:"actions"`
+	}](t, "contracts/control-plane.json")
+	want := map[string]bool{}
+	for _, action := range contract.Actions {
+		if action.Route == string(controlplane.CommonRaw) {
+			want[action.Name] = true
+		}
+	}
+	data, err := os.ReadFile("internal/controlplane/volumes.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := map[string]bool{}
+	pattern := regexp.MustCompile(`commonCall\(ctx,\s*"([A-Z][A-Za-z0-9]+)"`)
+	for _, match := range pattern.FindAllSubmatch(data, -1) {
+		used[string(match[1])] = true
+	}
+	if !reflect.DeepEqual(used, want) {
+		t.Fatalf("CommonClient control-plane calls drift: got=%v want=%v", used, want)
 	}
 }
 

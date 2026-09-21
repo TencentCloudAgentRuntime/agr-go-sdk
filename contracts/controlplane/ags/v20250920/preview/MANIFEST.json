@@ -8,11 +8,22 @@
   "source_schema_sha256": "d09e09e9a53ef59521c36f7c3cd5eeb78ce4aef64b0832ba4862abe82a183744",
   "source_patch_sha256": "56544a0b5b4a14c59a1caedfc74d9486358fd42e6868d95f15e2a33b4ed09ef0",
   "source_effective_sha256": "32519794cc2df4c7515f1fd223515735135480dedb4408cd8fe9669e911bab88",
-  "sdk_effective_sha256": "1017daeeae638bcb7254d51694b6e877b42062f06bcef302dcbad7a891232cb7",
-  "sdk_effective_actions": 19,
-  "sdk_effective_objects": 70,
+  "sdk_effective_sha256": "1676f441c4007a5ddd15ff2d6075b512d9928d442453bdd028859c4587e0c21e",
+  "sdk_effective_actions": 27,
+  "sdk_effective_objects": 96,
   "field_maturity_default": "stable",
-  "preview_fields": [],
+  "preview_fields": [
+    {
+      "object": "StorageMount",
+      "field": "Volume",
+      "maturity": "preview"
+    },
+    {
+      "object": "StorageMount",
+      "field": "VolumeTemplate",
+      "maturity": "preview"
+    }
+  ],
   "actions": [
     {
       "name": "AcquireDeploymentToken",
@@ -98,7 +109,43 @@
         "StorageSource",
         "Tag",
         "VPCConfig",
+        "VolumeRef",
+        "VolumeTemplateRef",
         "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "CreateVolume",
+      "resource": "volume",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CreateVolumeRequest",
+      "response": "CreateVolumeResponse",
+      "objects": [
+        "CfsSource",
+        "CosSource",
+        "CreateVolumeRequest",
+        "CreateVolumeResponse",
+        "Storage",
+        "Tag",
+        "Volume"
+      ]
+    },
+    {
+      "name": "CreateVolumeTemplate",
+      "resource": "volume_template",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CreateVolumeTemplateRequest",
+      "response": "CreateVolumeTemplateResponse",
+      "objects": [
+        "CfsSpec",
+        "CosSpec",
+        "CreateVolumeTemplateRequest",
+        "CreateVolumeTemplateResponse",
+        "StorageSpec",
+        "Tag",
+        "VolumeTemplate"
       ]
     },
     {
@@ -123,6 +170,30 @@
       "objects": [
         "DeleteSandboxToolRequest",
         "DeleteSandboxToolResponse"
+      ]
+    },
+    {
+      "name": "DeleteVolume",
+      "resource": "volume",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DeleteVolumeRequest",
+      "response": "DeleteVolumeResponse",
+      "objects": [
+        "DeleteVolumeRequest",
+        "DeleteVolumeResponse"
+      ]
+    },
+    {
+      "name": "DeleteVolumeTemplate",
+      "resource": "volume_template",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DeleteVolumeTemplateRequest",
+      "response": "DeleteVolumeTemplateResponse",
+      "objects": [
+        "DeleteVolumeTemplateRequest",
+        "DeleteVolumeTemplateResponse"
       ]
     },
     {
@@ -231,7 +302,45 @@
         "StorageSource",
         "Tag",
         "VPCConfig",
+        "VolumeRef",
+        "VolumeTemplateRef",
         "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "DescribeVolumeList",
+      "resource": "volume",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeVolumeListRequest",
+      "response": "DescribeVolumeListResponse",
+      "objects": [
+        "CfsSource",
+        "CosSource",
+        "DescribeVolumeListRequest",
+        "DescribeVolumeListResponse",
+        "Filter",
+        "Storage",
+        "Tag",
+        "Volume"
+      ]
+    },
+    {
+      "name": "DescribeVolumeTemplateList",
+      "resource": "volume_template",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeVolumeTemplateListRequest",
+      "response": "DescribeVolumeTemplateListResponse",
+      "objects": [
+        "CfsSpec",
+        "CosSpec",
+        "DescribeVolumeTemplateListRequest",
+        "DescribeVolumeTemplateListResponse",
+        "Filter",
+        "StorageSpec",
+        "Tag",
+        "VolumeTemplate"
       ]
     },
     {
@@ -349,6 +458,32 @@
         "UpdateSandboxToolResponse",
         "VPCConfig",
         "WAAConfiguration"
+      ]
+    },
+    {
+      "name": "UpdateVolume",
+      "resource": "volume",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "UpdateVolumeRequest",
+      "response": "UpdateVolumeResponse",
+      "objects": [
+        "Tag",
+        "UpdateVolumeRequest",
+        "UpdateVolumeResponse"
+      ]
+    },
+    {
+      "name": "UpdateVolumeTemplate",
+      "resource": "volume_template",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "UpdateVolumeTemplateRequest",
+      "response": "UpdateVolumeTemplateResponse",
+      "objects": [
+        "Tag",
+        "UpdateVolumeTemplateRequest",
+        "UpdateVolumeTemplateResponse"
       ]
     }
   ]

@@ -35,6 +35,20 @@
       "output": "CreateSandboxToolResponse",
       "status": "online"
     },
+    "CreateVolume": {
+      "document": "创建 Volume。\n\n直接指定真实存储信息创建独立 Volume，创建成功后返回 Volume 信息。",
+      "input": "CreateVolumeRequest",
+      "name": "创建 Volume",
+      "output": "CreateVolumeResponse",
+      "status": "online"
+    },
+    "CreateVolumeTemplate": {
+      "document": "创建 VolumeTemplate。\n\n模板不绑定固定路径，挂载时按 ReuseKey 派生或复用具体 Volume。",
+      "input": "CreateVolumeTemplateRequest",
+      "name": "创建 VolumeTemplate",
+      "output": "CreateVolumeTemplateResponse",
+      "status": "online"
+    },
     "DeleteDeployment": {
       "document": "删除 Deployment",
       "input": "DeleteDeploymentRequest",
@@ -47,6 +61,20 @@
       "input": "DeleteSandboxToolRequest",
       "name": "删除沙箱工具",
       "output": "DeleteSandboxToolResponse",
+      "status": "online"
+    },
+    "DeleteVolume": {
+      "document": "删除 Volume。\n\nVolume 仍被沙箱实例挂载时删除失败。",
+      "input": "DeleteVolumeRequest",
+      "name": "删除 Volume",
+      "output": "DeleteVolumeResponse",
+      "status": "online"
+    },
+    "DeleteVolumeTemplate": {
+      "document": "删除 VolumeTemplate。\n\n模板仍被活跃 Volume 引用时删除失败。",
+      "input": "DeleteVolumeTemplateRequest",
+      "name": "删除 VolumeTemplate",
+      "output": "DeleteVolumeTemplateResponse",
       "status": "online"
     },
     "DescribeDeployment": {
@@ -82,6 +110,20 @@
       "input": "DescribeSandboxToolListRequest",
       "name": "查询沙箱工具列表",
       "output": "DescribeSandboxToolListResponse",
+      "status": "online"
+    },
+    "DescribeVolumeList": {
+      "document": "查询 Volume 列表。\n\n支持按 ID、名称和通用过滤条件精确查询，并返回符合条件的总数。",
+      "input": "DescribeVolumeListRequest",
+      "name": "查询 Volume 列表",
+      "output": "DescribeVolumeListResponse",
+      "status": "online"
+    },
+    "DescribeVolumeTemplateList": {
+      "document": "查询 VolumeTemplate 列表。\n\n支持按 ID、名称和通用过滤条件精确查询，并返回符合条件的总数。",
+      "input": "DescribeVolumeTemplateListRequest",
+      "name": "查询 VolumeTemplate 列表",
+      "output": "DescribeVolumeTemplateListResponse",
       "status": "online"
     },
     "ModifyDeployment": {
@@ -131,6 +173,20 @@
       "input": "UpdateSandboxToolRequest",
       "name": "更新沙箱工具",
       "output": "UpdateSandboxToolResponse",
+      "status": "online"
+    },
+    "UpdateVolume": {
+      "document": "更新 Volume。\n\n仅支持更新标签；存储信息、访问模式和名称不可修改。",
+      "input": "UpdateVolumeRequest",
+      "name": "更新 Volume",
+      "output": "UpdateVolumeResponse",
+      "status": "online"
+    },
+    "UpdateVolumeTemplate": {
+      "document": "更新 VolumeTemplate。\n\n仅支持更新标签和预留容量；存储规格、访问模式和回收策略不可修改。",
+      "input": "UpdateVolumeTemplateRequest",
+      "name": "更新 VolumeTemplate",
+      "output": "UpdateVolumeTemplateResponse",
       "status": "online"
     }
   },
@@ -329,6 +385,64 @@
       ],
       "usage": "both"
     },
+    "CfsSource": {
+      "document": "CFS 真实存储来源。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCFS 文件系统 ID。\u003c/p\u003e",
+          "example": "cfs-a1b2c3d4",
+          "member": "string",
+          "name": "FileSystemId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e已固化的 CFS 路径，不包含模板变量。\u003c/p\u003e",
+          "example": "workspaces/session-s001",
+          "member": "string",
+          "name": "Path",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
+      "usage": "both"
+    },
+    "CfsSpec": {
+      "document": "CFS 模板存储规格。PathPattern 表达派生规则。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCFS 文件系统 ID。\u003c/p\u003e",
+          "example": "cfs-a1b2c3d4",
+          "member": "string",
+          "name": "FileSystemId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCFS 路径模板，可包含 ${reuse_key}。\u003c/p\u003e",
+          "example": "workspaces/${reuse_key}",
+          "member": "string",
+          "name": "PathPattern",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
+      "usage": "both"
+    },
     "CfsStorageSource": {
       "document": "文件存储配置",
       "members": [
@@ -383,6 +497,86 @@
           "value_allowed_null": false
         }
       ],
+      "usage": "both"
+    },
+    "CosSource": {
+      "document": "COS 真实存储来源。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS 访问 Endpoint。\u003c/p\u003e",
+          "example": "agent-assets.cos.ap-guangzhou.myqcloud.com",
+          "member": "string",
+          "name": "Endpoint",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS Bucket 名称。\u003c/p\u003e",
+          "example": "agent-assets",
+          "member": "string",
+          "name": "BucketName",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e已固化的 COS Bucket 路径，不包含模板变量。\u003c/p\u003e",
+          "example": "workspaces/session-s001",
+          "member": "string",
+          "name": "BucketPath",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
+      "usage": "both"
+    },
+    "CosSpec": {
+      "document": "COS 模板存储规格。BucketPathPattern 表达派生规则。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS 访问 Endpoint。\u003c/p\u003e",
+          "example": "agent-assets.cos.ap-guangzhou.myqcloud.com",
+          "member": "string",
+          "name": "Endpoint",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS Bucket 名称。\u003c/p\u003e",
+          "example": "agent-assets",
+          "member": "string",
+          "name": "BucketName",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS Bucket 路径模板，可包含 ${reuse_key}。\u003c/p\u003e",
+          "example": "workspaces/${reuse_key}",
+          "member": "string",
+          "name": "BucketPathPattern",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
       "usage": "both"
     },
     "CosStorageSource": {
@@ -717,6 +911,214 @@
       ],
       "type": "object"
     },
+    "CreateVolumeRequest": {
+      "document": "CreateVolume请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 名称，在当前认证 AppId 内唯一。\u003c/p\u003e",
+          "example": "agent-workspace",
+          "member": "string",
+          "name": "VolumeName",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问模式。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eReadWriteOnce：单实例独占读写\u003c/li\u003e\u003cli\u003eReadWriteMany：多实例共享读写\u003c/li\u003e\u003cli\u003eReadOnlyMany：多实例共享只读\u003c/li\u003e\u003c/ul\u003e",
+          "example": "ReadWriteMany",
+          "member": "string",
+          "name": "AccessMode",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e存储类型：Cos 或 Cfs。StorageSpec 中对应类型的字段与该值一致。\u003c/p\u003e",
+          "example": "Cos",
+          "member": "string",
+          "name": "StorageType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 的真实存储信息。Cos、Cfs 必须且只能设置一个。\u003c/p\u003e",
+          "example": "无",
+          "member": "Storage",
+          "name": "Storage",
+          "required": true,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签。\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e幂等 Token，最长 64 字符。重复提交相同 Token 与相同参数时返回首次创建的结果。\u003c/p\u003e",
+          "example": "create-volume-agent-workspace",
+          "member": "string",
+          "name": "ClientToken",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问底层存储使用的角色 ARN。\u003c/p\u003e",
+          "example": "qcs::cam::uin/100000000001:roleName/AGSCOSRole",
+          "member": "string",
+          "name": "StorageRoleArn",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": true,
+          "document": "\u003cp\u003e待克隆的源 Volume ID。\u003c/p\u003e",
+          "example": "vol-a1b2c3d4",
+          "member": "string",
+          "name": "SourceVolumeId",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "CreateVolumeResponse": {
+      "document": "CreateVolume返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e创建出的 Volume。\u003c/p\u003e",
+          "example": "无",
+          "member": "Volume",
+          "name": "Volume",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "CreateVolumeTemplateRequest": {
+      "document": "CreateVolumeTemplate请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 名称，在当前认证 AppId 内唯一。\u003c/p\u003e",
+          "example": "agent-session-workspace",
+          "member": "string",
+          "name": "VolumeTemplateName",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问模式。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eReadWriteOnce：单实例独占读写\u003c/li\u003e\u003cli\u003eReadWriteMany：多实例共享读写\u003c/li\u003e\u003cli\u003eReadOnlyMany：多实例共享只读\u003c/li\u003e\u003c/ul\u003e",
+          "example": "ReadWriteOnce",
+          "member": "string",
+          "name": "AccessMode",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e回收策略。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eRetain：派生出的 Volume 在沙箱删除后保留\u003c/li\u003e\u003cli\u003eDelete：派生出的 Volume 在沙箱删除后一并删除\u003c/li\u003e\u003c/ul\u003e",
+          "example": "Retain",
+          "member": "string",
+          "name": "ReclaimPolicy",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e模板存储规格。Cos、Cfs 必须且只能设置一个。\u003c/p\u003e",
+          "example": "无",
+          "member": "StorageSpec",
+          "name": "StorageSpec",
+          "required": true,
+          "type": "object"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e存储类型。StorageSpec 中对应类型的字段必须与该值一致。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eCos：使用 COS 作为存储后端\u003c/li\u003e\u003cli\u003eCfs：使用 CFS 作为存储后端\u003c/li\u003e\u003c/ul\u003e",
+          "example": "Cfs",
+          "member": "string",
+          "name": "StorageType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e派生 Volume 名称模板，可包含 ${reuse_key}。\u003c/p\u003e",
+          "example": "agent-workspace-${reuse_key}",
+          "member": "string",
+          "name": "VolumeNamePattern",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e预留容量字段，COS/CFS 后端不生效。\u003c/p\u003e",
+          "example": "100Gi",
+          "member": "string",
+          "name": "DefaultCapacity",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问底层存储使用的角色 ARN。\u003c/p\u003e",
+          "example": "qcs::cam::uin/100000000001:roleName/AGSCFSRole",
+          "member": "string",
+          "name": "StorageRoleArn",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e资源标签。\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e幂等 Token，最长 64 字符。重复提交相同 Token 与相同参数时返回首次创建的结果。\u003c/p\u003e",
+          "example": "create-volume-template-workspace",
+          "member": "string",
+          "name": "ClientToken",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "CreateVolumeTemplateResponse": {
+      "document": "CreateVolumeTemplate返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e创建出的 VolumeTemplate。\u003c/p\u003e",
+          "example": "无",
+          "member": "VolumeTemplate",
+          "name": "VolumeTemplate",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
     "CustomConfiguration": {
       "document": "沙箱自定义配置",
       "members": [
@@ -1029,6 +1431,64 @@
           "type": "string"
         }
       ],
+      "type": "object"
+    },
+    "DeleteVolumeRequest": {
+      "document": "DeleteVolume请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 Volume ID，格式 vol-xxxxxxxx。与 VolumeName 二选一。\u003c/p\u003e",
+          "example": "vol-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 名称。与 VolumeId 二选一。\u003c/p\u003e",
+          "example": "agent-workspace",
+          "member": "string",
+          "name": "VolumeName",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DeleteVolumeResponse": {
+      "document": "DeleteVolume返回参数结构体",
+      "members": [],
+      "type": "object"
+    },
+    "DeleteVolumeTemplateRequest": {
+      "document": "DeleteVolumeTemplate请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 VolumeTemplate ID，格式 volt-xxxxxxxx。与 VolumeTemplateName 二选一。\u003c/p\u003e",
+          "example": "volt-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeTemplateId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 名称。与 VolumeTemplateId 二选一。\u003c/p\u003e",
+          "example": "agent-session-workspace",
+          "member": "string",
+          "name": "VolumeTemplateName",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DeleteVolumeTemplateResponse": {
+      "document": "DeleteVolumeTemplate返回参数结构体",
+      "members": [],
       "type": "object"
     },
     "Deployment": {
@@ -1545,6 +2005,164 @@
           "member": "string",
           "name": "RequestId",
           "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeVolumeListRequest": {
+      "document": "DescribeVolumeList请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume ID 精确过滤列表，单次最多 100 个，格式为 vol-xxxxxxxx。\u003c/p\u003e",
+          "example": "[\"vol-a1b2c3d4\"]",
+          "member": "string",
+          "name": "VolumeIds",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 名称精确过滤列表，名称在当前认证 AppId 内解析。\u003c/p\u003e",
+          "example": "[\"agent-workspace\"]",
+          "member": "string",
+          "name": "VolumeNames",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e通用过滤条件；不同 Filter 之间为 AND，同一 Filter 的 Values 之间为 OR。\u003c/p\u003e",
+          "example": "无",
+          "member": "Filter",
+          "name": "Filters",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e分页偏移量，从 0 开始，默认值为 0。\u003c/p\u003e",
+          "example": "0",
+          "member": "uint64",
+          "name": "Offset",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e单次返回数量，默认值为 20，最大值为 100。\u003c/p\u003e",
+          "example": "20",
+          "member": "uint64",
+          "name": "Limit",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeVolumeListResponse": {
+      "document": "DescribeVolumeList返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 列表。\u003c/p\u003e",
+          "example": "无",
+          "member": "Volume",
+          "name": "VolumeSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e符合过滤条件且调用者有权限访问的 Volume 总数。\u003c/p\u003e",
+          "example": "1",
+          "member": "uint64",
+          "name": "TotalCount",
+          "output_required": true,
+          "required": false,
+          "type": "int",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeVolumeTemplateListRequest": {
+      "document": "DescribeVolumeTemplateList请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate ID 精确过滤列表，单次最多 100 个，格式为 volt-xxxxxxxx。\u003c/p\u003e",
+          "example": "[\"volt-a1b2c3d4\"]",
+          "member": "string",
+          "name": "VolumeTemplateIds",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 名称精确过滤列表。\u003c/p\u003e",
+          "example": "[\"agent-session-workspace\"]",
+          "member": "string",
+          "name": "VolumeTemplateNames",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e通用过滤条件；不同 Filter 之间为 AND，同一 Filter 的 Values 之间为 OR。\u003c/p\u003e",
+          "example": "无",
+          "member": "Filter",
+          "name": "Filters",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e分页偏移量，从 0 开始，默认值为 0。\u003c/p\u003e",
+          "example": "0",
+          "member": "uint64",
+          "name": "Offset",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e单次返回数量，默认值为 20，最大值为 100。\u003c/p\u003e",
+          "example": "20",
+          "member": "uint64",
+          "name": "Limit",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeVolumeTemplateListResponse": {
+      "document": "DescribeVolumeTemplateList返回参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 列表。\u003c/p\u003e",
+          "example": "无",
+          "member": "VolumeTemplate",
+          "name": "VolumeTemplateSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e符合过滤条件且调用者有权限访问的 VolumeTemplate 总数。\u003c/p\u003e",
+          "example": "1",
+          "member": "uint64",
+          "name": "TotalCount",
+          "output_required": true,
+          "required": false,
+          "type": "int",
+          "value_allowed_null": false
         }
       ],
       "type": "object"
@@ -2727,6 +3345,35 @@
       ],
       "type": "object"
     },
+    "Storage": {
+      "document": "Volume 真实存储信息。Cos、Cfs 必须且只能设置一个，且与 StorageType 一致。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS 真实存储来源。\u003c/p\u003e",
+          "example": "无",
+          "member": "CosSource",
+          "name": "Cos",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCFS 真实存储来源。\u003c/p\u003e",
+          "example": "无",
+          "member": "CfsSource",
+          "name": "Cfs",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object",
+      "usage": "both"
+    },
     "StorageMount": {
       "document": "沙箱工具中实例存储挂载配置",
       "members": [
@@ -2773,6 +3420,28 @@
           "required": false,
           "type": "bool",
           "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e挂载已有 Volume。与 StorageSource、VolumeTemplate 互斥。\u003c/p\u003e",
+          "example": "无",
+          "member": "VolumeRef",
+          "name": "Volume",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e挂载 VolumeTemplate，按 ReuseKey 派生或复用具体 Volume。与 StorageSource、Volume 互斥。\u003c/p\u003e",
+          "example": "无",
+          "member": "VolumeTemplateRef",
+          "name": "VolumeTemplate",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
         }
       ],
       "usage": "both"
@@ -2825,6 +3494,35 @@
           "value_allowed_null": false
         }
       ],
+      "usage": "both"
+    },
+    "StorageSpec": {
+      "document": "VolumeTemplate 存储规格。Cos、Cfs 必须且只能设置一个，且与 StorageType 一致。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCOS 模板存储规格。\u003c/p\u003e",
+          "example": "无",
+          "member": "CosSpec",
+          "name": "Cos",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eCFS 模板存储规格。\u003c/p\u003e",
+          "example": "无",
+          "member": "CfsSpec",
+          "name": "Cfs",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object",
       "usage": "both"
     },
     "Tag": {
@@ -2972,6 +3670,91 @@
       ],
       "type": "object"
     },
+    "UpdateVolumeRequest": {
+      "document": "UpdateVolume请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 Volume ID，格式 vol-xxxxxxxx。与 VolumeName 二选一。\u003c/p\u003e",
+          "example": "vol-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 名称。与 VolumeId 二选一。\u003c/p\u003e",
+          "example": "agent-workspace",
+          "member": "string",
+          "name": "VolumeName",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签。传入的列表整体替换现有标签。\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "UpdateVolumeResponse": {
+      "document": "UpdateVolume返回参数结构体",
+      "members": [],
+      "type": "object"
+    },
+    "UpdateVolumeTemplateRequest": {
+      "document": "UpdateVolumeTemplate请求参数结构体",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 VolumeTemplate ID，格式 volt-xxxxxxxx。与 VolumeTemplateName 二选一。\u003c/p\u003e",
+          "example": "volt-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeTemplateId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 名称。与 VolumeTemplateId 二选一。\u003c/p\u003e",
+          "example": "agent-session-workspace",
+          "member": "string",
+          "name": "VolumeTemplateName",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签。传入的列表整体替换现有标签。\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e预留容量字段，COS/CFS 后端不生效。\u003c/p\u003e",
+          "example": "100Gi",
+          "member": "string",
+          "name": "DefaultCapacity",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "UpdateVolumeTemplateResponse": {
+      "document": "UpdateVolumeTemplate返回参数结构体",
+      "members": [],
+      "type": "object"
+    },
     "VPCConfig": {
       "document": "沙箱工具VPC相关配置",
       "members": [
@@ -2998,6 +3781,375 @@
           "value_allowed_null": false
         }
       ],
+      "usage": "both"
+    },
+    "Volume": {
+      "document": "沙箱存储卷。独立创建，或由 VolumeTemplate 按 ReuseKey 派生。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 Volume ID，格式 vol-xxxxxxxx。\u003c/p\u003e",
+          "example": "vol-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 名称。\u003c/p\u003e",
+          "example": "agent-workspace",
+          "member": "string",
+          "name": "VolumeName",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问模式。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eReadWriteOnce：单实例独占读写\u003c/li\u003e\u003cli\u003eReadWriteMany：多实例共享读写\u003c/li\u003e\u003cli\u003eReadOnlyMany：多实例共享只读\u003c/li\u003e\u003c/ul\u003e",
+          "example": "ReadWriteMany",
+          "member": "string",
+          "name": "AccessMode",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e回收策略。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eRetain：派生出的 Volume 在沙箱删除后保留\u003c/li\u003e\u003cli\u003eDelete：派生出的 Volume 在沙箱删除后一并删除\u003c/li\u003e\u003c/ul\u003e",
+          "example": "Retain",
+          "member": "string",
+          "name": "ReclaimPolicy",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 状态，例如 CREATING、ACTIVE。\u003c/p\u003e",
+          "example": "ACTIVE",
+          "member": "string",
+          "name": "Status",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e存储类型。Storage 中对应类型的字段必须与该值一致。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eCos：使用 COS 作为存储后端\u003c/li\u003e\u003cli\u003eCfs：使用 CFS 作为存储后端\u003c/li\u003e\u003c/ul\u003e",
+          "example": "Cos",
+          "member": "string",
+          "name": "StorageType",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e真实存储信息；内部类型字段与 StorageType 一致。\u003c/p\u003e",
+          "example": "无",
+          "member": "Storage",
+          "name": "Storage",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e派生该 Volume 的父模板 ID，格式 volt-xxxxxxxx。独立 Volume 为空。\u003c/p\u003e",
+          "example": "volt-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeTemplateId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e模板派生复用键。独立 Volume 为空。\u003c/p\u003e",
+          "example": "session-s001",
+          "member": "string",
+          "name": "ReuseKey",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e标签。独立 Volume 为自有标签；派生 Volume 投影模板标签。\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "output_required": false,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e创建时间。\u003c/p\u003e",
+          "example": "2026-07-21T08:00:00Z",
+          "member": "datetime_iso",
+          "name": "CreatedAt",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e更新时间。\u003c/p\u003e",
+          "example": "2026-07-21T08:00:00Z",
+          "member": "datetime_iso",
+          "name": "UpdatedAt",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问底层存储使用的角色 ARN。\u003c/p\u003e",
+          "example": "qcs::cam::uin/100000000001:roleName/AGSCOSRole",
+          "member": "string",
+          "name": "StorageRoleArn",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eReadWriteOnce Volume 当前被挂载的沙箱实例 ID。未挂载时为空。\u003c/p\u003e",
+          "example": "rd2xjhpjrs7qqdbg37dwxu7nfdqltvbo",
+          "member": "string",
+          "name": "MountedInstanceId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
+      "usage": "output"
+    },
+    "VolumeRef": {
+      "document": "对 Volume 的引用。VolumeName 与 VolumeId 至少提供一个。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolume 名称。服务端在当前认证 AppId 下解析为稳定 VolumeId。\u003c/p\u003e",
+          "example": "agent-workspace",
+          "member": "string",
+          "name": "VolumeName",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 Volume ID，格式 vol-xxxxxxxx。\u003c/p\u003e",
+          "example": "vol-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
+      "usage": "both"
+    },
+    "VolumeTemplate": {
+      "document": "沙箱存储卷模板。按 ReuseKey 派生或复用具体 Volume。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e稳定 VolumeTemplate ID，格式 volt-xxxxxxxx。\u003c/p\u003e",
+          "example": "volt-a1b2c3d4",
+          "member": "string",
+          "name": "VolumeTemplateId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 名称。\u003c/p\u003e",
+          "example": "agent-session-workspace",
+          "member": "string",
+          "name": "VolumeTemplateName",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问模式。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eReadWriteOnce：单实例独占读写\u003c/li\u003e\u003cli\u003eReadWriteMany：多实例共享读写\u003c/li\u003e\u003cli\u003eReadOnlyMany：多实例共享只读\u003c/li\u003e\u003c/ul\u003e",
+          "example": "ReadWriteOnce",
+          "member": "string",
+          "name": "AccessMode",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e回收策略。\u003c/p\u003e\u003cp\u003e枚举值：\u003c/p\u003e\u003cul\u003e\u003cli\u003eRetain：派生出的 Volume 在沙箱删除后保留\u003c/li\u003e\u003cli\u003eDelete：派生出的 Volume 在沙箱删除后一并删除\u003c/li\u003e\u003c/ul\u003e",
+          "example": "Retain",
+          "member": "string",
+          "name": "ReclaimPolicy",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e模板状态，例如 CREATING、ACTIVE。\u003c/p\u003e",
+          "example": "ACTIVE",
+          "member": "string",
+          "name": "Status",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e模板存储规格；内部类型字段与 StorageType 一致。\u003c/p\u003e",
+          "example": "无",
+          "member": "StorageSpec",
+          "name": "StorageSpec",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e存储类型：Cos 或 Cfs。Storage 中对应类型的字段与该值一致。\u003c/p\u003e",
+          "example": "Cfs",
+          "member": "string",
+          "name": "StorageType",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e派生 Volume 名称模板，可包含 ${reuse_key}。\u003c/p\u003e",
+          "example": "agent-workspace-${reuse_key}",
+          "member": "string",
+          "name": "VolumeNamePattern",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e预留容量字段，COS/CFS 后端不生效。\u003c/p\u003e",
+          "example": "100Gi",
+          "member": "string",
+          "name": "DefaultCapacity",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e访问底层存储使用的角色 ARN。\u003c/p\u003e",
+          "example": "qcs::cam::uin/100000000001:roleName/AGSCFSRole",
+          "member": "string",
+          "name": "StorageRoleArn",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e资源标签。\u003c/p\u003e",
+          "example": "无",
+          "member": "Tag",
+          "name": "Tags",
+          "output_required": false,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e创建时间。\u003c/p\u003e",
+          "example": "2026-07-21T08:17:16Z",
+          "member": "datetime_iso",
+          "name": "CreatedAt",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e更新时间。\u003c/p\u003e",
+          "example": "2026-07-21T08:17:16Z",
+          "member": "datetime_iso",
+          "name": "UpdatedAt",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
+      "usage": "output"
+    },
+    "VolumeTemplateRef": {
+      "document": "对 VolumeTemplate 的引用以及派生规则。",
+      "members": [
+        {
+          "disabled": false,
+          "document": "\u003cp\u003eVolumeTemplate 名称。\u003c/p\u003e",
+          "example": "agent-session-workspace",
+          "member": "string",
+          "name": "VolumeTemplateName",
+          "output_required": false,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "disabled": false,
+          "document": "\u003cp\u003e复用键，用于把模板派生成具体 Volume。可为字面量，也可为 ${metadata.xxx} 引用实例元数据。\u003c/p\u003e",
+          "example": "${metadata.session_id}",
+          "member": "string",
+          "name": "ReuseKey",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object",
       "usage": "both"
     },
     "WAAConfiguration": {
