@@ -41,6 +41,14 @@ type a1CloudEnvironment struct {
 	preCacheRegistryType agr.ImageRegistryType
 }
 
+type volumeCloudEnvironment struct {
+	cloudEnvironment
+	fileSystemID   string
+	toolType       agr.ToolType
+	toolRoleARN    string
+	storageRoleARN string
+}
+
 func requireDeploymentEnvironment(t *testing.T) cloudEnvironment {
 	t.Helper()
 	if os.Getenv("AGS_E2E") != "1" {
@@ -50,6 +58,9 @@ func requireDeploymentEnvironment(t *testing.T) cloudEnvironment {
 		if os.Getenv(name) == "" {
 			t.Fatalf("real Deployment E2E requires %s", name)
 		}
+	}
+	if os.Getenv("AGS_E2E_REGION") != "ap-shanghai" {
+		t.Fatalf("real Deployment E2E requires AGS_E2E_REGION=ap-shanghai, got %q", os.Getenv("AGS_E2E_REGION"))
 	}
 	return cloudEnvironment{region: os.Getenv("AGS_E2E_REGION"), toolID: os.Getenv("AGS_E2E_TOOL_ID")}
 }
@@ -87,6 +98,25 @@ func requireA1CloudEnvironment(t *testing.T) a1CloudEnvironment {
 		cloudEnvironment:     cloudEnvironment{region: os.Getenv("AGS_E2E_REGION")},
 		preCacheImage:        image,
 		preCacheRegistryType: registry,
+	}
+}
+
+func requireVolumeCloudEnvironment(t *testing.T) volumeCloudEnvironment {
+	t.Helper()
+	if os.Getenv("AGS_E2E") != "1" {
+		t.Fatal("real persistent Volume E2E requires AGS_E2E=1")
+	}
+	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY", "AGR_VOLUME_CFS_FILESYSTEM_ID", "AGR_VOLUME_TOOL_TYPE"} {
+		if os.Getenv(name) == "" {
+			t.Fatalf("real persistent Volume E2E requires %s", name)
+		}
+	}
+	return volumeCloudEnvironment{
+		cloudEnvironment: cloudEnvironment{region: "ap-shanghai"},
+		fileSystemID:     os.Getenv("AGR_VOLUME_CFS_FILESYSTEM_ID"),
+		toolType:         agr.ToolType(os.Getenv("AGR_VOLUME_TOOL_TYPE")),
+		toolRoleARN:      os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
+		storageRoleARN:   os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),
 	}
 }
 

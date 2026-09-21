@@ -26,6 +26,9 @@ source-incompatible changes.
   Cloud Actions, plus managed direct HTTP, SSE, and WebSocket data-plane connections.
 - Lazy, coalesced Deployment token refresh, connection affinity handling, connection-scoped
   cancellation, deterministic loopback coverage, a cookbook journey, and opt-in real Cloud E2E.
+- Preview `Volume` and `VolumeTemplate` managers with create/get/list/update/delete operations,
+  plus Tool mounts by Volume ID/name or VolumeTemplate reuse key and a persistent-storage
+  cookbook journey.
 
 ### Changed
 
@@ -39,7 +42,9 @@ source-incompatible changes.
 - The control-plane manifest records stable/preview source channel, resource ownership,
   maturity, transport route, request/response types, and per-Action object closures.
 - Tencent Cloud AGS and common modules are updated to 1.3.179.
-- The stable and preview control-plane allowlists contain 19 typed Actions and no raw fallback.
+- The stable control-plane allowlist remains 19 typed Actions. Preview adds eight reviewed
+  Volume and VolumeTemplate Actions through an internal `CommonClient` allowlist; there is no
+  public raw call or typed-to-raw fallback.
 
 ### Removed
 

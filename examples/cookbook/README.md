@@ -13,6 +13,7 @@ running it. All creation examples close local resources and delete only the inst
 | Create Tool, run Sandbox, clean up | [06_tool_sandbox](06_tool_sandbox/main.go) | `tool-sandbox` |
 | Create and observe image pre-cache | [07_pre_cache](07_pre_cache/main.go) | `pre-cache-image` |
 | Deployment control and HTTP/SSE/WebSocket data plane | [08_deployment](08_deployment/main.go) | Create, connect, delete |
+| Preview persistent Volume mounts | [09_persistent_volume](09_persistent_volume/main.go) | Volume, VolumeTemplate, Tool mount, Sandbox cleanup |
 
 The journey IDs are machine-readable in [`contracts/journeys.json`](../../contracts/journeys.json).
 File streaming, Watch, PTY, lifecycle, and cleanup behavior are covered by the root README and
@@ -28,3 +29,9 @@ The Deployment example expects `AGR_TOOL_ID` and `AGR_DEPLOYMENT_PORT`. The refe
 serve the example's `/health`, `/events`, and `/ws` routes on that port. The SDK obtains and
 refreshes the Deployment access token internally. Closing the connection stops local HTTP/SSE/
 WebSocket work; only `Deployments().Delete` removes the remote resource.
+
+The persistent-volume example is available only from a Preview release. It requires a reviewed,
+disposable CFS fixture through `AGR_VOLUME_CFS_FILESYSTEM_ID`, an envd-capable
+`AGR_VOLUME_TOOL_TYPE`, and any role ARNs required by the account. It never deletes the CFS file
+system. Cleanup runs in dependency order: Sandbox, Tool, retained derived Volumes,
+VolumeTemplate, then the standalone Volume.

@@ -18,8 +18,10 @@ Client
   |                      `-- Metrics
   |-- ToolManager -> ToolInfo / ToolMutationResult
   |-- PreCacheImageManager -> PreCacheImageInfo
-  `-- DeploymentManager -> DeploymentInfo
-                          `-> DeploymentConnection -> HTTP / SSE / WebSocket
+  |-- DeploymentManager -> DeploymentInfo
+  |                       `-> DeploymentConnection -> HTTP / SSE / WebSocket
+  |-- VolumeManager -> VolumeInfo
+  `-- VolumeTemplateManager -> VolumeTemplateInfo
 ```
 
 `Client` binds one Tencent Cloud identity, region, endpoints, and request policy.
@@ -31,6 +33,12 @@ Tool and pre-cache managers are account-level, control-plane-only services. Thei
 descriptions, mutation receipts, and task status are immutable SDK-owned values rather than
 connected handles: they have no local generation and no `Close`. A mutation never triggers an
 implicit Describe, and deleting a Tool never cascades to Sandboxes.
+
+Preview Volume and VolumeTemplate managers are also account-level, control-plane-only services.
+They return immutable SDK-owned values. A Tool mount selects exactly one of a direct storage
+source, an existing Volume reference, or a VolumeTemplate reference. Deleting a Sandbox or Tool
+does not imply deletion of standalone storage; template reclaim policy is server-owned and callers
+still explicitly clean retained derived Volumes.
 
 Deployment control operations also return immutable snapshots. `DeploymentConnection` is the
 only stateful Deployment object: it binds one Deployment, region, domain, and Tool port. It owns
@@ -62,6 +70,9 @@ agr / sandbox (public facades)
 - `internal/controlplane` owns Cloud clients, signing integration, typed Action mapping,
   lifecycle polling, Metrics requests, instance-token acquisition, and construction
   of a fresh runtime generation.
+- Preview Volume Actions use the official Tencent Cloud `common.CommonClient` only through a
+  compile-time internal allowlist because the pinned generated AGS models do not contain them.
+  Existing typed Actions never fall back to this path after failure, and no raw call is public.
 - `internal/runtime` owns generation validity, request lifetimes, handles, stream
   pumps, bounded queues, output aggregation, and local invalidation.
 - `internal/dataplane` owns immutable endpoints and instance access material,

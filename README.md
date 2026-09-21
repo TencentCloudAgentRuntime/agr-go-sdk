@@ -7,6 +7,8 @@ product-level entry point for credentials, regions, transport policy, and
 first-class resources. The current release provides managed `Sandbox`
 lifecycles and data-plane operations, stable Deployment control and managed
 HTTP/SSE/WebSocket connections, Tool management, and image pre-cache tasks.
+Preview prereleases additionally expose Volume and VolumeTemplate management and persistent Tool
+mounts.
 
 This is a new Go module, not an in-place release of `ags-go-sdk`. Existing
 users should read [Migrating from ags-go-sdk](MIGRATING_FROM_AGS_GO_SDK.md).
@@ -154,6 +156,12 @@ remain private; requests cannot select another host. See the complete
 peer services only after their server contract, lifecycle, errors, tests, and cookbook journey
 are available. This repository does not publish placeholder services.
 
+Preview releases provide `client.Volumes()` and `client.VolumeTemplates()`. A Tool mount chooses
+one source: `StorageSource`, `ToolVolumeRef`, or `ToolVolumeTemplateRef`. Template reuse keys,
+including `${metadata.session_id}`, are sent unchanged. Deleting a Sandbox or Tool does not
+implicitly delete a standalone Volume; a retained template-derived Volume also requires explicit
+cleanup. See the [persistent Volume cookbook](examples/cookbook/09_persistent_volume/main.go).
+
 ## Capabilities
 
 | Area | API |
@@ -168,6 +176,8 @@ are available. This repository does not publish placeholder services.
 | Image pre-cache | `Create` and `Get` by image, digest, and registry type |
 | Deployment control | `Create`, `Get`, `List`, `Update`, `WaitFor`, `Delete`, `WaitDeleted` |
 | Deployment data plane | direct managed HTTP/SSE `Do`, context-aware WebSocket, token refresh, affinity |
+| Preview Volume | `Create`, exact `Get`, offset `List`, `Update`, `Delete` |
+| Preview VolumeTemplate | `Create`, exact `Get`, offset `List`, `Update`, `Delete`, Tool reuse-key mounts |
 
 ## Lifecycle rules
 

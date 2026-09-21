@@ -5,6 +5,7 @@
 这是腾讯云 Agent Runtime（AGR）的原生 Go SDK。`Client` 是凭证、地域、传输策略和
 一级资源的产品入口。当前版本提供受管理的 `Sandbox` 生命周期和数据面操作、Deployment
 控制面与 HTTP/SSE/WebSocket 连接、稳定的 Tool 管理能力，以及镜像预热任务。
+Preview 预发布版本还提供 Volume、VolumeTemplate 管理和 Tool 持久卷挂载。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
 [从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
@@ -147,6 +148,12 @@ WebSocket handle。访问 Token、目标 authority 和 affinity 状态不进入�
 `Client` 的边界有意大于 Sandbox。后续一级资源只有在服务契约、生命周期、错误、测试和
 Cookbook 用户旅程齐备后才会作为同级服务加入；仓库不发布占位服务。
 
+Preview 版本提供 `client.Volumes()` 和 `client.VolumeTemplates()`。一个 Tool mount 只能选择
+`StorageSource`、`ToolVolumeRef` 或 `ToolVolumeTemplateRef` 中的一种来源。`${metadata.session_id}`
+等模板复用键会原样发送。删除 Sandbox 或 Tool 不会隐式删除独立 Volume；Retain 策略产生的
+Volume 也需要显式清理。完整流程见
+[持久卷 Cookbook](examples/cookbook/09_persistent_volume/main.go)。
+
 ## 能力
 
 | 范围 | API |
@@ -161,6 +168,8 @@ Cookbook 用户旅程齐备后才会作为同级服务加入；仓库不发布�
 | 镜像预热 | 按镜像、摘要和镜像仓库类型执行 `Create`、`Get` |
 | Deployment 控制面 | `Create`、`Get`、`List`、`Update`、`WaitFor`、`Delete`、`WaitDeleted` |
 | Deployment 数据面 | 直连受管 HTTP/SSE `Do`、支持 context 的 WebSocket、Token 刷新、affinity |
+| Preview Volume | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete` |
+| Preview VolumeTemplate | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`、Tool reuse-key 挂载 |
 
 ## 生命周期规则
 
