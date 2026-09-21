@@ -74,9 +74,14 @@ export AGR_VOLUME_COS_BUCKET=...         # reviewed Bucket; never deleted by the
 # CFS option instead of COS
 export AGR_VOLUME_CFS_FILESYSTEM_ID=...  # reviewed ap-guangzhou CFS; never deleted by the test
 
-export AGR_VOLUME_TOOL_TYPE=...          # envd-capable Tool type supported by the fixture
-export AGR_VOLUME_TOOL_ROLE_ARN=...      # optional, when Tool mounts require a role
-export AGR_VOLUME_STORAGE_ROLE_ARN=...   # optional, when storage access requires a role
+# Preferred for custom Tools: copied read-only; never modified or deleted by the test
+export AGR_VOLUME_BASE_TOOL_ID=...
+
+# Built-in alternative instead of AGR_VOLUME_BASE_TOOL_ID
+export AGR_VOLUME_TOOL_TYPE=code-interpreter
+
+export AGR_VOLUME_TOOL_ROLE_ARN=...      # optional override for the copied or built-in Tool
+export AGR_VOLUME_STORAGE_ROLE_ARN=...   # optional; defaults to the copied Tool role
 cd test
 go test -v -count=1 -run '^TestPersistentVolumeCloudJourney$' .
 ```
@@ -86,7 +91,9 @@ resources under `agr-sdk-e2e/<run-id>`, and cleans up in dependency order. A boo
 creates that unique COS prefix or CFS subpath before Volume creation and removes only its contents
 at the end. The test deletes Sandboxes, its Tools, derived and standalone Volumes, and then its
 VolumeTemplates; it never deletes the Bucket or CFS file system and never reuses an unreviewed
-account resource. The fixture must belong to `ap-guangzhou`; cross-region storage is invalid.
+account resource. A base Tool is queried by exact ID only; its runtime configuration is copied to
+the two test-owned Tools, while the base Tool itself remains unchanged. The fixture and base Tool
+must belong to `ap-guangzhou`; cross-region resources are invalid.
 Missing or ambiguous fixture variables fail before any network request instead of selecting an
 existing resource from List.
 

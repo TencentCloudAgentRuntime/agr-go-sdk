@@ -10,10 +10,6 @@ import (
 )
 
 func run() error {
-	toolType := os.Getenv("AGR_VOLUME_TOOL_TYPE")
-	if toolType == "" {
-		return fmt.Errorf("AGR_VOLUME_TOOL_TYPE is required")
-	}
 	fixture, err := volumeFixtureFromEnv()
 	if err != nil {
 		return err
@@ -28,16 +24,21 @@ func run() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
+	toolFixture, err := volumeToolFixtureFromEnv(ctx, client)
+	if err != nil {
+		return err
+	}
+	storageRoleARN := os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN")
+	if storageRoleARN == "" {
+		storageRoleARN = toolFixture.roleARN
+	}
 
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	basePath := "agr-sdk-cookbook/" + suffix
-	bootstrapTool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
-		Name:          "agr-sdk-volume-bootstrap-" + suffix,
-		Type:          agr.ToolType(toolType),
-		Network:       agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
-		RoleARN:       os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
-		StorageMounts: []agr.ToolStorageMount{fixture.bootstrapMount(basePath)},
-	})
+	bootstrapTool, err := client.Tools().Create(ctx, toolFixture.createOptions(
+		"agr-sdk-volume-bootstrap-"+suffix,
+		[]agr.ToolStorageMount{fixture.bootstrapMount(basePath)},
+	))
 	if err != nil {
 		return err
 	}
@@ -74,7 +75,7 @@ func run() error {
 		AccessMode:     agr.VolumeReadWriteMany,
 		StorageType:    fixture.storageType,
 		Storage:        fixture.volumeStorage(basePath + "/direct"),
-		StorageRoleARN: os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),
+		StorageRoleARN: storageRoleARN,
 		Tags:           []agr.VolumeTag{{Key: "agr-sdk-example", Value: "owned"}},
 	})
 	if err != nil {
@@ -89,7 +90,7 @@ func run() error {
 		StorageType:       fixture.storageType,
 		Storage:           fixture.volumeTemplateStorage(basePath + "/${reuse_key}"),
 		VolumeNamePattern: "agr-sdk-derived-${reuse_key}",
-		StorageRoleARN:    os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),
+		StorageRoleARN:    storageRoleARN,
 		Tags:              []agr.VolumeTag{{Key: "agr-sdk-example", Value: "owned"}},
 	})
 	if err != nil {
@@ -98,17 +99,14 @@ func run() error {
 	defer deleteTemplateAndDerivedVolumes(client, template.ID)
 
 	readOnly := true
-	tool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
-		Name:    "agr-sdk-volume-tool-" + suffix,
-		Type:    agr.ToolType(toolType),
-		Network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
-		RoleARN: os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
-		StorageMounts: []agr.ToolStorageMount{
+	tool, err := client.Tools().Create(ctx, toolFixture.createOptions(
+		"agr-sdk-volume-tool-"+suffix,
+		[]agr.ToolStorageMount{
 			{Name: "direct", MountPath: "/mnt/direct", Volume: &agr.ToolVolumeRef{ID: volume.ID}},
 			{Name: "direct-read-only", MountPath: "/mnt/direct-ro", ReadOnly: &readOnly, Volume: &agr.ToolVolumeRef{Name: volume.Name}},
 			{Name: "session", MountPath: "/mnt/session", VolumeTemplate: &agr.ToolVolumeTemplateRef{Name: template.Name, ReuseKey: "${metadata.session_id}"}},
 		},
-	})
+	))
 	if err != nil {
 		return err
 	}
@@ -146,6 +144,68 @@ type volumeFixture struct {
 	cosEndpoint  string
 	cosBucket    string
 	fileSystemID string
+}
+
+type volumeToolFixture struct {
+	toolType              agr.ToolType
+	network               agr.ToolNetworkConfiguration
+	roleARN               string
+	customConfiguration   *agr.ToolCustomConfiguration
+	computerConfiguration *agr.ToolComputerConfiguration
+	logConfiguration      *agr.ToolLogConfiguration
+}
+
+func volumeToolFixtureFromEnv(ctx context.Context, client *agr.Client) (volumeToolFixture, error) {
+	baseToolID := os.Getenv("AGR_VOLUME_BASE_TOOL_ID")
+	toolType := agr.ToolType(os.Getenv("AGR_VOLUME_TOOL_TYPE"))
+	if (baseToolID == "") == (toolType == "") {
+		return volumeToolFixture{}, fmt.Errorf("exactly one of AGR_VOLUME_BASE_TOOL_ID or AGR_VOLUME_TOOL_TYPE is required")
+	}
+	roleARN := os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN")
+	if baseToolID == "" {
+		if toolType == agr.ToolCustom {
+			return volumeToolFixture{}, fmt.Errorf("AGR_VOLUME_BASE_TOOL_ID is required for custom Tools")
+		}
+		return volumeToolFixture{toolType: toolType, network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic}, roleARN: roleARN}, nil
+	}
+	base, err := client.Tools().Get(ctx, baseToolID)
+	if err != nil {
+		return volumeToolFixture{}, fmt.Errorf("read base Tool: %w", err)
+	}
+	if base.State != agr.ToolActive {
+		return volumeToolFixture{}, fmt.Errorf("base Tool is %s, want %s", base.State, agr.ToolActive)
+	}
+	fixture := volumeToolFixture{
+		toolType:              base.Type,
+		network:               base.Network,
+		roleARN:               base.RoleARN,
+		computerConfiguration: base.ComputerConfiguration,
+		logConfiguration:      base.LogConfiguration,
+	}
+	if roleARN != "" {
+		fixture.roleARN = roleARN
+	}
+	if base.CustomConfiguration != nil {
+		custom := base.CustomConfiguration.ToolCustomConfiguration
+		fixture.customConfiguration = &custom
+	}
+	if fixture.toolType == agr.ToolCustom && fixture.customConfiguration == nil {
+		return volumeToolFixture{}, fmt.Errorf("custom base Tool returned no CustomConfiguration")
+	}
+	return fixture, nil
+}
+
+func (f volumeToolFixture) createOptions(name string, mounts []agr.ToolStorageMount) agr.CreateToolOptions {
+	return agr.CreateToolOptions{
+		Name:                  name,
+		Type:                  f.toolType,
+		Network:               f.network,
+		RoleARN:               f.roleARN,
+		StorageMounts:         mounts,
+		CustomConfiguration:   f.customConfiguration,
+		ComputerConfiguration: f.computerConfiguration,
+		LogConfiguration:      f.logConfiguration,
+	}
 }
 
 func volumeFixtureFromEnv() (volumeFixture, error) {

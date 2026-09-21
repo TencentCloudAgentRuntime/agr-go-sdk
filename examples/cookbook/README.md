@@ -32,8 +32,10 @@ WebSocket work; only `Deployments().Delete` removes the remote resource.
 
 The persistent-volume example is available only from a Preview release. It requires exactly one
 reviewed storage fixture: `AGR_VOLUME_COS_ENDPOINT` together with `AGR_VOLUME_COS_BUCKET`, or
-`AGR_VOLUME_CFS_FILESYSTEM_ID`. It also requires an envd-capable `AGR_VOLUME_TOOL_TYPE` and any
-role ARNs required by the account. The default region is `ap-guangzhou`; if
+`AGR_VOLUME_CFS_FILESYSTEM_ID`. It also requires exactly one Tool source: an explicit
+`AGR_VOLUME_BASE_TOOL_ID`, or an envd-capable built-in `AGR_VOLUME_TOOL_TYPE`. A custom Tool must
+use the base-Tool form so the example can copy its image configuration without modifying or
+deleting the original Tool. Role ARN variables may override the copied role. The default region is `ap-guangzhou`; if
 `TENCENTCLOUD_REGION` overrides it, the selected fixture must belong to that same region. A
 temporary bootstrap Tool/Sandbox creates and later removes only the example's unique COS prefix
 or CFS subpath. It never deletes the Bucket or CFS file system. Cleanup runs in dependency order:

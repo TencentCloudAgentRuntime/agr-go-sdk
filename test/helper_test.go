@@ -47,6 +47,7 @@ type volumeCloudEnvironment struct {
 	cosEndpoint    string
 	cosBucket      string
 	fileSystemID   string
+	baseToolID     string
 	toolType       agr.ToolType
 	toolRoleARN    string
 	storageRoleARN string
@@ -109,10 +110,18 @@ func requireVolumeCloudEnvironment(t *testing.T) volumeCloudEnvironment {
 	if os.Getenv("AGS_E2E") != "1" {
 		t.Fatal("real persistent Volume E2E requires AGS_E2E=1")
 	}
-	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY", "AGR_VOLUME_TOOL_TYPE"} {
+	for _, name := range []string{"TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY"} {
 		if os.Getenv(name) == "" {
 			t.Fatalf("real persistent Volume E2E requires %s", name)
 		}
+	}
+	baseToolID := os.Getenv("AGR_VOLUME_BASE_TOOL_ID")
+	toolType := agr.ToolType(os.Getenv("AGR_VOLUME_TOOL_TYPE"))
+	if (baseToolID == "") == (toolType == "") {
+		t.Fatal("real persistent Volume E2E requires exactly one of AGR_VOLUME_BASE_TOOL_ID or AGR_VOLUME_TOOL_TYPE")
+	}
+	if toolType == agr.ToolCustom {
+		t.Fatal("real persistent Volume E2E requires AGR_VOLUME_BASE_TOOL_ID for custom Tools")
 	}
 	cosEndpoint := os.Getenv("AGR_VOLUME_COS_ENDPOINT")
 	cosBucket := os.Getenv("AGR_VOLUME_COS_BUCKET")
@@ -134,7 +143,8 @@ func requireVolumeCloudEnvironment(t *testing.T) volumeCloudEnvironment {
 		cosEndpoint:      cosEndpoint,
 		cosBucket:        cosBucket,
 		fileSystemID:     fileSystemID,
-		toolType:         agr.ToolType(os.Getenv("AGR_VOLUME_TOOL_TYPE")),
+		baseToolID:       baseToolID,
+		toolType:         toolType,
 		toolRoleARN:      os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
 		storageRoleARN:   os.Getenv("AGR_VOLUME_STORAGE_ROLE_ARN"),
 	}

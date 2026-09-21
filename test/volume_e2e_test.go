@@ -16,6 +16,10 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	client := newCloudClient(t, environment.cloudEnvironment)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
+	toolFixture := resolveVolumeToolFixture(t, ctx, client, environment)
+	if environment.storageRoleARN == "" {
+		environment.storageRoleARN = toolFixture.roleARN
+	}
 
 	beforeVolumes := volumeIDs(t, ctx, client.Volumes())
 	beforeTemplates := volumeTemplateIDs(t, ctx, client.VolumeTemplates())
@@ -25,14 +29,11 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	suffix := fmt.Sprintf("%d-%d", time.Now().Unix(), os.Getpid())
 	path := "agr-sdk-e2e/" + suffix
 	keyA, keyB := "session-a-"+suffix, "session-b-"+suffix
-	bootstrapTool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
-		Name:          "agr-sdk-e2e-volume-bootstrap-" + suffix,
-		Type:          environment.toolType,
-		Network:       agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
-		RoleARN:       environment.toolRoleARN,
-		Tags:          []agr.ToolTag{{Key: "agr-sdk-e2e", Value: suffix}},
-		StorageMounts: []agr.ToolStorageMount{environment.bootstrapMount(path)},
-	})
+	bootstrapTool, err := client.Tools().Create(ctx, toolFixture.createOptions(
+		"agr-sdk-e2e-volume-bootstrap-"+suffix,
+		[]agr.ToolTag{{Key: "agr-sdk-e2e", Value: suffix}},
+		[]agr.ToolStorageMount{environment.bootstrapMount(path)},
+	))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,20 +62,17 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	owned.templates[deleted.ID] = true
 
 	readOnly := true
-	createdTool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
-		Name:    "agr-sdk-e2e-volume-tool-" + suffix,
-		Type:    environment.toolType,
-		Network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
-		RoleARN: environment.toolRoleARN,
-		Tags:    []agr.ToolTag{{Key: "agr-sdk-e2e", Value: suffix}},
-		StorageMounts: []agr.ToolStorageMount{
+	createdTool, err := client.Tools().Create(ctx, toolFixture.createOptions(
+		"agr-sdk-e2e-volume-tool-"+suffix,
+		[]agr.ToolTag{{Key: "agr-sdk-e2e", Value: suffix}},
+		[]agr.ToolStorageMount{
 			{Name: "by-name", MountPath: "/mnt/by-name", Volume: &agr.ToolVolumeRef{Name: standalone.Name}},
 			{Name: "by-id", MountPath: "/mnt/by-id", ReadOnly: &readOnly, Volume: &agr.ToolVolumeRef{ID: standalone.ID}},
 			{Name: "shared", MountPath: "/mnt/shared", VolumeTemplate: &agr.ToolVolumeTemplateRef{Name: shared.Name, ReuseKey: "${metadata.session_id}"}},
 			{Name: "retain", MountPath: "/mnt/retain", VolumeTemplate: &agr.ToolVolumeTemplateRef{Name: retained.Name, ReuseKey: "${metadata.session_id}"}},
 			{Name: "delete", MountPath: "/mnt/delete", VolumeTemplate: &agr.ToolVolumeTemplateRef{Name: deleted.Name, ReuseKey: "${metadata.session_id}"}},
 		},
-	})
+	))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,6 +254,65 @@ func (e volumeCloudEnvironment) volumeTemplateStorage(pattern string) agr.Volume
 	return agr.VolumeTemplateStorage{CFS: &agr.VolumeTemplateCFSStorage{FileSystemID: e.fileSystemID, PathPattern: "/" + pattern}}
 }
 
+type volumeToolFixture struct {
+	toolType              agr.ToolType
+	network               agr.ToolNetworkConfiguration
+	roleARN               string
+	customConfiguration   *agr.ToolCustomConfiguration
+	computerConfiguration *agr.ToolComputerConfiguration
+	logConfiguration      *agr.ToolLogConfiguration
+}
+
+func resolveVolumeToolFixture(t *testing.T, ctx context.Context, client *agr.Client, environment volumeCloudEnvironment) volumeToolFixture {
+	t.Helper()
+	if environment.baseToolID == "" {
+		return volumeToolFixture{
+			toolType: environment.toolType,
+			network:  agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
+			roleARN:  environment.toolRoleARN,
+		}
+	}
+	base, err := client.Tools().Get(ctx, environment.baseToolID)
+	if err != nil {
+		t.Fatalf("read base Tool: %v", err)
+	}
+	if base.State != agr.ToolActive {
+		t.Fatalf("base Tool %s is %s, want %s", base.ID, base.State, agr.ToolActive)
+	}
+	fixture := volumeToolFixture{
+		toolType:              base.Type,
+		network:               base.Network,
+		roleARN:               base.RoleARN,
+		computerConfiguration: base.ComputerConfiguration,
+		logConfiguration:      base.LogConfiguration,
+	}
+	if environment.toolRoleARN != "" {
+		fixture.roleARN = environment.toolRoleARN
+	}
+	if base.CustomConfiguration != nil {
+		custom := base.CustomConfiguration.ToolCustomConfiguration
+		fixture.customConfiguration = &custom
+	}
+	if fixture.toolType == agr.ToolCustom && fixture.customConfiguration == nil {
+		t.Fatal("custom base Tool returned no CustomConfiguration")
+	}
+	return fixture
+}
+
+func (f volumeToolFixture) createOptions(name string, tags []agr.ToolTag, mounts []agr.ToolStorageMount) agr.CreateToolOptions {
+	return agr.CreateToolOptions{
+		Name:                  name,
+		Type:                  f.toolType,
+		Network:               f.network,
+		RoleARN:               f.roleARN,
+		Tags:                  tags,
+		StorageMounts:         mounts,
+		CustomConfiguration:   f.customConfiguration,
+		ComputerConfiguration: f.computerConfiguration,
+		LogConfiguration:      f.logConfiguration,
+	}
+}
+
 func TestVolumeFixtureContract(t *testing.T) {
 	cos := volumeCloudEnvironment{storageType: agr.VolumeStorageCOS, cosEndpoint: "cos.ap-guangzhou.myqcloud.com", cosBucket: "fixture-1250000000"}
 	cosMount := cos.bootstrapMount("agr-sdk-e2e/run")
@@ -281,6 +338,13 @@ func TestVolumeFixtureContract(t *testing.T) {
 	}
 	if cfs.volumeTemplateStorage("agr-sdk-e2e/run/${reuse_key}").CFS == nil || cfs.fixtureMountPath("agr-sdk-e2e/run") != "/mnt/bootstrap/agr-sdk-e2e/run" {
 		t.Fatal("CFS fixture projection is incomplete")
+	}
+
+	custom := &agr.ToolCustomConfiguration{Image: "registry.example/fixture:latest", ImageRegistryType: agr.ImageRegistryPersonal}
+	tool := volumeToolFixture{toolType: agr.ToolCustom, network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic}, roleARN: "fixture-role", customConfiguration: custom}
+	options := tool.createOptions("derived", []agr.ToolTag{{Key: "owner", Value: "e2e"}}, []agr.ToolStorageMount{{Name: "data", MountPath: "/mnt/data"}})
+	if options.Type != agr.ToolCustom || options.CustomConfiguration != custom || options.RoleARN != "fixture-role" || len(options.Tags) != 1 || len(options.StorageMounts) != 1 {
+		t.Fatalf("derived Tool options = %+v", options)
 	}
 }
 

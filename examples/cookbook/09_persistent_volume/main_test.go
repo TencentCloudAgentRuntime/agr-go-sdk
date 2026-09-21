@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	agr "github.com/TencentCloudAgentRuntime/agr-go-sdk"
@@ -77,4 +78,36 @@ func TestVolumeFixtureBuildsCOSAndCFSContracts(t *testing.T) {
 			t.Fatal("CFS template storage is missing")
 		}
 	})
+}
+
+func TestVolumeToolFixtureSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		baseID   string
+		toolType string
+	}{
+		{name: "none"},
+		{name: "both", baseID: "sdt-base", toolType: "code-interpreter"},
+		{name: "custom-needs-base", toolType: "custom"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("AGR_VOLUME_BASE_TOOL_ID", tc.baseID)
+			t.Setenv("AGR_VOLUME_TOOL_TYPE", tc.toolType)
+			if _, err := volumeToolFixtureFromEnv(context.Background(), nil); err == nil {
+				t.Fatal("volumeToolFixtureFromEnv unexpectedly accepted an invalid selector")
+			}
+		})
+	}
+
+	t.Setenv("AGR_VOLUME_BASE_TOOL_ID", "")
+	t.Setenv("AGR_VOLUME_TOOL_TYPE", "code-interpreter")
+	t.Setenv("AGR_VOLUME_TOOL_ROLE_ARN", "qcs::cam::uin/100000000001:roleName/fixture")
+	fixture, err := volumeToolFixtureFromEnv(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := fixture.createOptions("derived", []agr.ToolStorageMount{{Name: "data", MountPath: "/mnt/data"}})
+	if options.Type != agr.ToolCodeInterpreter || options.Network.Mode != agr.ToolNetworkPublic || options.RoleARN == "" || len(options.StorageMounts) != 1 {
+		t.Fatalf("derived Tool options = %+v", options)
+	}
 }
