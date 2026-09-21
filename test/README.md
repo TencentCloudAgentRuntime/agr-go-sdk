@@ -63,7 +63,7 @@ go test -v -count=1 -run '^TestToolCursorAndPreCacheCloudJourney$' .
 The minimal environment for that command is `AGS_E2E=1`, the two Tencent Cloud secret variables,
 `AGS_E2E_REGION`, `AGS_E2E_PRECACHE_IMAGE`, and `AGS_E2E_PRECACHE_REGISTRY_TYPE`.
 
-The Preview persistent-Volume journey always runs in `ap-shanghai`; it does not use
+The Preview persistent-Volume journey always runs in `ap-guangzhou`; it does not use
 `AGS_E2E_REGION`. Its additional fixture variables are:
 
 ```bash

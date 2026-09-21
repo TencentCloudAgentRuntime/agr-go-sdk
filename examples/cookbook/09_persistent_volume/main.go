@@ -17,7 +17,7 @@ func run() error {
 	}
 	region := os.Getenv("TENCENTCLOUD_REGION")
 	if region == "" {
-		region = "ap-shanghai"
+		region = "ap-guangzhou"
 	}
 	client, err := agr.NewClient(agr.WithRegion(region))
 	if err != nil {

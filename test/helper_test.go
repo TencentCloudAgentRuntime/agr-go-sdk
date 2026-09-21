@@ -112,7 +112,7 @@ func requireVolumeCloudEnvironment(t *testing.T) volumeCloudEnvironment {
 		}
 	}
 	return volumeCloudEnvironment{
-		cloudEnvironment: cloudEnvironment{region: "ap-shanghai"},
+		cloudEnvironment: cloudEnvironment{region: "ap-guangzhou"},
 		fileSystemID:     os.Getenv("AGR_VOLUME_CFS_FILESYSTEM_ID"),
 		toolType:         agr.ToolType(os.Getenv("AGR_VOLUME_TOOL_TYPE")),
 		toolRoleARN:      os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
