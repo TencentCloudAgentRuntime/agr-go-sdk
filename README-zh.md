@@ -3,8 +3,8 @@
 [English](README.md)
 
 这是腾讯云 Agent Runtime（AGR）的原生 Go SDK。`Client` 是凭证、地域、传输策略和
-一级资源的产品入口。当前版本提供受管理的 `Sandbox` 生命周期和数据面操作、稳定的 Tool
-管理能力，以及镜像预热任务。
+一级资源的产品入口。当前版本提供受管理的 `Sandbox` 生命周期和数据面操作、Deployment
+控制面与 HTTP/SSE/WebSocket 连接、稳定的 Tool 管理能力，以及镜像预热任务。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
 [从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
@@ -35,8 +35,8 @@ export TENCENTCLOUD_SECRET_KEY=your-secret-key
 export TENCENTCLOUD_TOKEN=your-session-token
 ```
 
-Create、Connect 或 Resume 完成后，SDK 通过控制面取得沙箱实例访问材料。该材料只在
-SDK 内部使用。公共 API 不接收或返回该材料，也不会把它写入 URL。
+SDK 按需通过控制面取得沙箱实例和 Deployment 访问材料。该材料只在 SDK 内部使用。
+公共 API 不接收或返回该材料，也不会把它写入 URL。
 
 ## 快速开始
 
@@ -123,6 +123,27 @@ task, err := client.PreCacheImages().Create(ctx, agr.CreatePreCacheImageOptions{
 })
 ```
 
+Deployment 也只通过显式 Client 使用。控制操作返回不可变快照；`Connect` 返回绑定一个
+Tool 端口的本地连接：
+
+```go
+deployment, err := client.Deployments().WaitFor(ctx, deploymentID, agr.DeploymentActive)
+if err != nil {
+	return err
+}
+connection, err := client.Deployments().Connect(ctx, deployment.ID, agr.DeploymentConnectOptions{Port: 8080})
+if err != nil {
+	return err
+}
+defer connection.Close() // 只关闭本地 HTTP/SSE/WebSocket 操作
+
+response, err := connection.Do(ctx, agr.DeploymentRequest{Method: http.MethodGet, Path: "/health"})
+```
+
+普通 HTTP 和流式读取 SSE 都使用 `Do`。`DialWebSocket` 返回 SDK 自有、支持 context 的
+WebSocket handle。访问 Token、目标 authority 和 affinity 状态不进入公共 API，请求也不能
+选择其他主机。完整流程见 [Deployment Cookbook](examples/cookbook/08_deployment/main.go)。
+
 `Client` 的边界有意大于 Sandbox。后续一级资源只有在服务契约、生命周期、错误、测试和
 Cookbook 用户旅程齐备后才会作为同级服务加入；仓库不发布占位服务。
 
@@ -138,6 +159,8 @@ Cookbook 用户旅程齐备后才会作为同级服务加入；仓库不发布�
 | Metrics | 十项类型化指标，支持 `Start`、`End`、采样周期和部分成功 |
 | Tool | `Create`、精确 `Get`、偏移量 `List`、`Update`、`WaitFor`、幂等 `Delete` |
 | 镜像预热 | 按镜像、摘要和镜像仓库类型执行 `Create`、`Get` |
+| Deployment 控制面 | `Create`、`Get`、`List`、`Update`、`WaitFor`、`Delete`、`WaitDeleted` |
+| Deployment 数据面 | 直连受管 HTTP/SSE `Do`、支持 context 的 WebSocket、Token 刷新、affinity |
 
 ## 生命周期规则
 
@@ -152,6 +175,10 @@ Cookbook 用户旅程齐备后才会作为同级服务加入；仓库不发布�
 - 删除 Tool 不会级联删除 Sandbox。应先删除依赖实例，再删除本次流程创建的 Tool ID。
 - 创建预热任务不表示镜像已就绪。应使用返回的完整镜像、摘要和仓库类型引用轮询 `Get`。
   稳定输入只支持 `enterprise` 和 `personal`；服务行为未验证前不承诺 `custom`。
+- `DeploymentConnection.Close()` 取消本连接正在进行的 HTTP/SSE/WebSocket 操作，不删除
+  Deployment。删除是异步操作，调用方应显式调用 `Delete` 和 `WaitDeleted`。
+- Deployment Token 按需获取并由 SDK 内部刷新和脱敏，不作为公共参数或返回值。服务返回
+  401 时，SDK 将响应交给调用方并使缓存 Token 失效，不自动重放请求。
 
 Create 和 Resume 接受 30 秒至 24 小时的整秒 Timeout。Update 最低为 300 秒。Connect
 先读取实例状态：PAUSED 使用 Resume 规则，RUNNING 使用 Update 规则。SDK 会原样发送

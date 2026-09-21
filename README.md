@@ -5,8 +5,8 @@
 The native Go SDK for Tencent Cloud Agent Runtime (AGR). `Client` is the
 product-level entry point for credentials, regions, transport policy, and
 first-class resources. The current release provides managed `Sandbox`
-lifecycles and data-plane operations, stable Tool management, and image
-pre-cache tasks.
+lifecycles and data-plane operations, stable Deployment control and managed
+HTTP/SSE/WebSocket connections, Tool management, and image pre-cache tasks.
 
 This is a new Go module, not an in-place release of `ags-go-sdk`. Existing
 users should read [Migrating from ags-go-sdk](MIGRATING_FROM_AGS_GO_SDK.md).
@@ -38,9 +38,9 @@ export TENCENTCLOUD_SECRET_KEY=your-secret-key
 export TENCENTCLOUD_TOKEN=your-session-token
 ```
 
-The SDK obtains Sandbox instance access material through the control plane after Create,
-Connect, or Resume. That material is internal: it is not accepted or returned by the public
-API and is never placed in a URL.
+The SDK obtains Sandbox instance and Deployment access material through the control plane when
+needed. That material is internal: it is not accepted or returned by the public API and is never
+placed in a URL.
 
 ## Quick start
 
@@ -128,6 +128,28 @@ task, err := client.PreCacheImages().Create(ctx, agr.CreatePreCacheImageOptions{
 })
 ```
 
+Deployments are also explicit Client resources. Control operations return immutable snapshots;
+`Connect` returns a local connection for one Tool port:
+
+```go
+deployment, err := client.Deployments().WaitFor(ctx, deploymentID, agr.DeploymentActive)
+if err != nil {
+	return err
+}
+connection, err := client.Deployments().Connect(ctx, deployment.ID, agr.DeploymentConnectOptions{Port: 8080})
+if err != nil {
+	return err
+}
+defer connection.Close() // local HTTP/SSE/WebSocket operations only
+
+response, err := connection.Do(ctx, agr.DeploymentRequest{Method: http.MethodGet, Path: "/health"})
+```
+
+`Do` supports ordinary HTTP and incrementally consumed SSE responses. `DialWebSocket` returns an
+SDK-owned, context-aware WebSocket handle. The access token, target authority, and affinity state
+remain private; requests cannot select another host. See the complete
+[Deployment cookbook](examples/cookbook/08_deployment/main.go).
+
 `Client` is intentionally broader than Sandbox. Additional first-class resources are exposed as
 peer services only after their server contract, lifecycle, errors, tests, and cookbook journey
 are available. This repository does not publish placeholder services.
@@ -144,6 +166,8 @@ are available. This repository does not publish placeholder services.
 | Metrics | ten typed Cloud Monitor series with `Start`, `End`, period, and partial success |
 | Tools | `Create`, exact `Get`, offset `List`, `Update`, `WaitFor`, idempotent `Delete` |
 | Image pre-cache | `Create` and `Get` by image, digest, and registry type |
+| Deployment control | `Create`, `Get`, `List`, `Update`, `WaitFor`, `Delete`, `WaitDeleted` |
+| Deployment data plane | direct managed HTTP/SSE `Do`, context-aware WebSocket, token refresh, affinity |
 
 ## Lifecycle rules
 
@@ -163,6 +187,11 @@ are available. This repository does not publish placeholder services.
 - Pre-cache creation does not mean the image is ready. Poll `Get` with the returned complete
   image/digest/registry reference. Stable inputs accept `enterprise` and `personal`; `custom` is
   intentionally not promised without a verified service contract.
+- `DeploymentConnection.Close()` cancels its active HTTP/SSE/WebSocket work and does not delete
+  the Deployment. Deletion is asynchronous; call `Delete` and `WaitDeleted` explicitly.
+- Deployment access tokens are acquired lazily, refreshed internally, redacted, and never exposed
+  as public input or output. A 401 is returned to the caller and invalidates the cached token; the
+  SDK does not replay the request.
 
 Create and Resume accept whole-second lifetimes from 30 seconds through 24 hours. Update uses
 a 300-second minimum. Connect reads state first: a paused instance follows Resume rules and a

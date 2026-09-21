@@ -47,6 +47,11 @@ The full CLI schema and its patch are not copied into this repository. `ags-cli`
 of patch validation and rendering; the SDK synchronization command invokes that implementation
 from an explicitly supplied checkout.
 
+The Deployment Action metadata and field semantics were synchronized from `ags-cli` revision
+`c8ca7d347f667266b44419c62272dcf31fb2febe`. The Deployment data-plane token and affinity state
+machines were independently implemented against that public contract, with the CLI behavior used
+as a compatibility reference. No CLI source file or private endpoint is copied into this module.
+
 ## Verification
 
 `make verify-contracts` is offline. It checks the committed reduced snapshot hash, exact object

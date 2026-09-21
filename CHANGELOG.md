@@ -22,6 +22,10 @@ source-incompatible changes.
 - Cursor-based Sandbox listing with opaque `NextToken` and optional exact total counts.
 - Reproducible stable and preview control-plane snapshots with explicit preview-field selection,
   stable-superset verification, and semantic-version release-channel checks.
+- Stable Deployment create/get/list/update/delete/wait operations backed by six official typed
+  Cloud Actions, plus managed direct HTTP, SSE, and WebSocket data-plane connections.
+- Lazy, coalesced Deployment token refresh, connection affinity handling, connection-scoped
+  cancellation, deterministic loopback coverage, a cookbook journey, and opt-in real Cloud E2E.
 
 ### Changed
 
@@ -35,6 +39,7 @@ source-incompatible changes.
 - The control-plane manifest records stable/preview source channel, resource ownership,
   maturity, transport route, request/response types, and per-Action object closures.
 - Tencent Cloud AGS and common modules are updated to 1.3.179.
+- The stable and preview control-plane allowlists contain 19 typed Actions and no raw fallback.
 
 ### Removed
 

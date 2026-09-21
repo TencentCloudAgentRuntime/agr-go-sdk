@@ -18,9 +18,11 @@ make test-e2e
 ```
 
 `TENCENTCLOUD_TOKEN` is optional for temporary Cloud credentials. The tests never accept an API
-key or a Sandbox instance token.
+key or a Sandbox instance token. `AGS_E2E_CONTROL_ENDPOINT` optionally overrides the official
+Cloud endpoint for an authorized test environment; omit it for the public endpoint.
 
-The suite is serial (`-p=1`), creates at most five sandboxes and one uniquely named Tool, and registers independent cleanup
+The suite is serial (`-p=1`), creates at most five sandboxes, one uniquely named Tool, and one
+uniquely named Deployment, and registers independent cleanup
 for each accepted creation. Cleanup sends Delete and polls until the control plane reports
 `STOPPED` or `NOT_FOUND`. A failed cleanup fails the test. Do not run it against a shared Tool
 unless you are authorized to create and delete test instances.
@@ -31,6 +33,22 @@ It also starts and observes one pre-cache task. The test account therefore needs
 Sandbox CRUD/data-plane, and image pre-cache permissions. The image must already be readable by
 the account; the SDK does not create or delete a registry image. The test rejects unverified
 `custom` registry input and accepts `enterprise` or `personal` only.
+
+The Deployment journey uses `AGS_E2E_TOOL_ID` as a shared envd-capable Tool; it never deletes the
+Tool. It creates a scale-to-zero Deployment, exercises Create/Get/List/Update, connects directly
+to port 49983, sends a ConnectRPC JSON `Filesystem/ListDir` request, closes the local connection,
+then proves that the Deployment remains ACTIVE. Independent cleanup submits asynchronous deletion
+and polls until exact NotFound, so a cleanup failure fails the test.
+
+To run only the Deployment journey:
+
+```bash
+cd test
+go test -v -count=1 -run '^TestDeploymentControlAndHTTPCloudJourney$' .
+```
+
+Its minimal environment is `AGS_E2E=1`, the two Tencent Cloud secret variables,
+`AGS_E2E_REGION`, and `AGS_E2E_TOOL_ID`.
 
 To run only this A0+A1 journey, `AGS_E2E_TOOL_ID` and `AGS_E2E_CODE_TOOL_ID` are not required:
 

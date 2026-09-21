@@ -17,7 +17,9 @@ Client
   |                      |-- Code
   |                      `-- Metrics
   |-- ToolManager -> ToolInfo / ToolMutationResult
-  `-- PreCacheImageManager -> PreCacheImageInfo
+  |-- PreCacheImageManager -> PreCacheImageInfo
+  `-- DeploymentManager -> DeploymentInfo
+                          `-> DeploymentConnection -> HTTP / SSE / WebSocket
 ```
 
 `Client` binds one Tencent Cloud identity, region, endpoints, and request policy.
@@ -29,6 +31,12 @@ Tool and pre-cache managers are account-level, control-plane-only services. Thei
 descriptions, mutation receipts, and task status are immutable SDK-owned values rather than
 connected handles: they have no local generation and no `Close`. A mutation never triggers an
 implicit Describe, and deleting a Tool never cascades to Sandboxes.
+
+Deployment control operations also return immutable snapshots. `DeploymentConnection` is the
+only stateful Deployment object: it binds one Deployment, region, domain, and Tool port. It owns
+lazy token refresh, affinity discovery/rotation, active HTTP bodies, and WebSockets. Its `Close`
+cancels local operations and never performs Cloud deletion. The public API exposes neither the
+short-lived token nor a configurable request authority.
 
 `Client` is the stable expansion point for AGR resources. A new resource service is
 added only with a public Cloud or data-plane contract, explicit ownership and lifecycle,
@@ -42,7 +50,9 @@ agr / sandbox (public facades)
         |
         +--> internal/controlplane --> official Tencent Cloud SDK
         |
-        `--> internal/runtime --> internal/dataplane --> internal/gen
+        +--> internal/runtime --> internal/dataplane --> internal/gen
+        |
+        `--> internal/dataplane/deployment
                     |
                     `--> internal/model
 ```
@@ -56,6 +66,9 @@ agr / sandbox (public facades)
   pumps, bounded queues, output aggregation, and local invalidation.
 - `internal/dataplane` owns immutable endpoints and instance access material,
   authentication headers, HTTP/Connect calls, protocol parsing, and start barriers.
+- `internal/dataplane/deployment` owns the direct Deployment HTTPS and WSS transport, coalesced
+  token refresh, affinity sequencing, and connection-scoped cancellation. Its WebSocket library
+  type remains private.
 - `internal/gen` contains generated protocol bindings. It may be consumed only by
   the data-plane implementation and protocol fixtures.
 - `internal/model` contains the smallest wire-independent DTO and error vocabulary
@@ -80,6 +93,13 @@ the generation that created them.
 
 Normal stream close, generation invalidation, and explicit remote process signals are
 separate operations. Moving implementation across layers must not merge those meanings.
+
+A Deployment connection has a separate, simpler lifecycle. `Connect` first verifies that the
+Deployment is ACTIVE, but tokens are acquired only on the first data request. The SDK refreshes
+them before the two-hour safety window and coalesces concurrent refreshes. If refresh fails, a
+still-valid token may be used. A 401 invalidates the token without replaying the request. Affinity
+IDs are learned from the configured response header; discovery and rotation are serialized so a
+late response cannot restore stale affinity. Connection close cancels HTTP/SSE/WebSocket work.
 
 ## Adding a capability
 

@@ -16,7 +16,9 @@ Client
   |                      |-- Code
   |                      `-- Metrics
   |-- ToolManager -> ToolInfo / ToolMutationResult
-  `-- PreCacheImageManager -> PreCacheImageInfo
+  |-- PreCacheImageManager -> PreCacheImageInfo
+  `-- DeploymentManager -> DeploymentInfo
+                          `-> DeploymentConnection -> HTTP / SSE / WebSocket
 ```
 
 一个 `Client` 绑定一套腾讯云身份、地域、Endpoint 和请求策略。Create 和 Connect 都返回
@@ -26,6 +28,11 @@ Sandbox 实现。
 Tool 和预热 manager 是账号级纯控制面服务。它们返回的描述、mutation 回执和任务状态是
 SDK 自有的不可变值，不是已连接 handle：没有本地 generation，也不需要 `Close`。mutation
 不会隐式触发 Describe，删除 Tool 也不会级联删除 Sandbox。
+
+Deployment 控制操作同样返回不可变快照。`DeploymentConnection` 是唯一有状态的 Deployment
+对象，固定绑定一个 Deployment、地域、domain 和 Tool 端口，负责 Token 延迟刷新、affinity
+发现与轮换、活跃 HTTP body 和 WebSocket。`Close` 只取消本地操作，不触发 Cloud 删除。
+公共 API 不暴露短期 Token，也不允许请求自行指定 authority。
 
 `Client` 是 AGR 一级资源的稳定扩展点。新资源只有在具备公开控制面或数据面契约、明确的
 所有权和生命周期、稳定错误、确定性测试、Cookbook 用户旅程及发布文档后才会加入。
@@ -38,7 +45,9 @@ agr / sandbox（公共 facade）
         |
         +--> internal/controlplane --> 腾讯云官方 SDK
         |
-        `--> internal/runtime --> internal/dataplane --> internal/gen
+        +--> internal/runtime --> internal/dataplane --> internal/gen
+        |
+        `--> internal/dataplane/deployment
                     |
                     `--> internal/model
 ```
@@ -50,6 +59,8 @@ agr / sandbox（公共 facade）
   输出聚合和本地失效。
 - `internal/dataplane` 负责不可变 Endpoint 和实例访问材料、鉴权 Header、HTTP/Connect 调用、
   协议解析和 start barrier。
+- `internal/dataplane/deployment` 负责 Deployment HTTPS/WSS 直连、并发 Token 刷新合并、
+  affinity 顺序和连接级取消。WebSocket 依赖的类型只在内部使用。
 - `internal/gen` 保存生成的协议绑定，只允许数据面实现和协议测试夹具引用。
 - `internal/model` 只保存多个内部层确实需要共享的最小 wire-independent DTO 和错误词汇，
   不 alias 公共类型或生成类型。
@@ -69,6 +80,12 @@ PTY、Code execution 和受管理 Code context 都属于创建它们的 generati
 
 正常关闭流、generation 失效和显式远端进程信号是三种不同操作。跨层移动实现时不得合并
 这些语义。
+
+Deployment connection 使用独立且更简单的生命周期。`Connect` 先确认 Deployment 为 ACTIVE，
+首次数据请求才获取 Token。SDK 在两小时安全窗口前刷新 Token，并合并并发刷新；刷新失败时
+可以继续使用尚未过期的 Token。401 使 Token 缓存失效，但不会重放请求。SDK 从配置的响应
+Header 学习 affinity ID，并串行处理首次发现和轮换，避免迟到响应恢复旧 ID。关闭 connection
+会取消 HTTP/SSE/WebSocket 操作。
 
 ## 增加能力
 
