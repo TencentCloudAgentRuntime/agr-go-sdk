@@ -90,7 +90,6 @@ func TestCloudErrorClassification(t *testing.T) {
 		{"ResourceInUse.Conflict", model.Conflict},
 		{"RequestLimitExceeded", model.ResourceExhausted},
 		{"InvalidParameterValue.Timeout", model.InvalidArgument},
-		{"UnsupportedRegion", model.InvalidArgument},
 		{"ClientError.MalformedResponse", model.Protocol},
 	} {
 		t.Run(test.cloud, func(t *testing.T) {

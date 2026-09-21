@@ -12,7 +12,7 @@ running it. All creation examples close local resources and delete only the inst
 | Opaque cursor pagination | [05_cursor_list](05_cursor_list/main.go) | `cursor-list` |
 | Create Tool, run Sandbox, clean up | [06_tool_sandbox](06_tool_sandbox/main.go) | `tool-sandbox` |
 | Create and observe image pre-cache | [07_pre_cache](07_pre_cache/main.go) | `pre-cache-image` |
-| Deployment control and HTTP/SSE/WebSocket data plane | [08_deployment](08_deployment/main.go) | `deployment-control-data` |
+| Deployment control and HTTP/SSE/WebSocket data plane | [08_deployment](08_deployment/main.go) | Create, connect, delete |
 
 The journey IDs are machine-readable in [`contracts/journeys.json`](../../contracts/journeys.json).
 File streaming, Watch, PTY, lifecycle, and cleanup behavior are covered by the root README and

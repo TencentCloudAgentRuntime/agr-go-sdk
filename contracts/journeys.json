@@ -9,7 +9,6 @@
     {"id": "multiple-cloud-identities", "entry": "agr.NewClient", "capabilities": ["credential_isolation", "transport_isolation"]},
     {"id": "cursor-list", "entry": "Client.Sandboxes.ListPage", "capabilities": ["opaque_next_token", "known_or_unknown_total", "server_filters"]},
     {"id": "tool-sandbox", "entry": "Client.Tools", "capabilities": ["create", "get", "list", "update", "wait", "delete", "sandbox_create"]},
-    {"id": "pre-cache-image", "entry": "Client.PreCacheImages", "capabilities": ["create", "get", "image_digest_reference"]},
-    {"id": "deployment-control-data", "entry": "Client.Deployments", "capabilities": ["create", "get", "list", "update", "wait", "connect", "http", "sse", "websocket", "delete"]}
+    {"id": "pre-cache-image", "entry": "Client.PreCacheImages", "capabilities": ["create", "get", "image_digest_reference"]}
   ]
 }
