@@ -33,5 +33,6 @@ WebSocket work; only `Deployments().Delete` removes the remote resource.
 The persistent-volume example is available only from a Preview release. It requires a reviewed,
 disposable CFS fixture through `AGR_VOLUME_CFS_FILESYSTEM_ID`, an envd-capable
 `AGR_VOLUME_TOOL_TYPE`, and any role ARNs required by the account. It never deletes the CFS file
-system. Cleanup runs in dependency order: Sandbox, Tool, retained derived Volumes,
-VolumeTemplate, then the standalone Volume.
+system. A temporary bootstrap Tool/Sandbox creates and later removes only the example's unique
+CFS subpath. Cleanup runs in dependency order: workload Sandbox, Tool, retained derived Volumes,
+VolumeTemplate, standalone Volume, fixture subpath, bootstrap Sandbox, then bootstrap Tool.

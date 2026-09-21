@@ -24,6 +24,31 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 
 	suffix := fmt.Sprintf("%d-%d", time.Now().Unix(), os.Getpid())
 	path := "/agr-sdk-e2e/" + suffix
+	keyA, keyB := "session-a-"+suffix, "session-b-"+suffix
+	bootstrapTool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
+		Name:    "agr-sdk-e2e-volume-bootstrap-" + suffix,
+		Type:    environment.toolType,
+		Network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
+		RoleARN: environment.toolRoleARN,
+		Tags:    []agr.ToolTag{{Key: "agr-sdk-e2e", Value: suffix}},
+		StorageMounts: []agr.ToolStorageMount{{
+			Name: "bootstrap", MountPath: "/mnt/bootstrap",
+			Source: &agr.ToolStorageSource{CFS: &agr.ToolCFSStorage{FileSystemID: environment.fileSystemID, Path: "/"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned.toolIDs = append(owned.toolIDs, bootstrapTool.ToolID)
+	if _, err = client.Tools().WaitFor(ctx, bootstrapTool.ToolID, agr.ToolActive); err != nil {
+		t.Fatal(err)
+	}
+	owned.bootstrap = createE2EVolumeSandbox(t, ctx, client, bootstrapTool.ToolID, "bootstrap-"+suffix)
+	owned.bootstrapPath = "/mnt/bootstrap" + path
+	runVolumeCommand(t, ctx, owned.bootstrap, fmt.Sprintf(
+		"mkdir -p -- %[1]s/direct %[1]s/shared/%[2]s %[1]s/shared/%[3]s %[1]s/retain/%[2]s %[1]s/retain/%[3]s %[1]s/delete/%[2]s %[1]s/delete/%[3]s; chmod -R 0777 -- %[1]s",
+		owned.bootstrapPath, keyA, keyB,
+	))
 	standalone := createE2EVolume(t, ctx, client, environment, "agr-sdk-e2e-volume-"+suffix, path+"/direct")
 	owned.volumes[standalone.ID] = true
 	shared := createE2ETemplate(t, ctx, client, environment, "agr-sdk-e2e-shared-"+suffix, agr.VolumeReclaimRetain, path+"/shared/${reuse_key}")
@@ -51,7 +76,7 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owned.toolID = createdTool.ToolID
+	owned.toolIDs = append(owned.toolIDs, createdTool.ToolID)
 	tool, err := client.Tools().WaitFor(ctx, createdTool.ToolID, agr.ToolActive)
 	if err != nil {
 		t.Fatal(err)
@@ -60,10 +85,11 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 		t.Fatalf("Tool Preview mounts = %+v", tool.StorageMounts)
 	}
 
-	keyA, keyB := "session-a-"+suffix, "session-b-"+suffix
 	sandboxA := createE2EVolumeSandbox(t, ctx, client, createdTool.ToolID, keyA)
 	owned.sandboxes = append(owned.sandboxes, sandboxA)
 	runVolumeCommand(t, ctx, sandboxA, "set -eu; printf direct > /mnt/by-name/probe; test \"$(cat /mnt/by-id/probe)\" = direct; if touch /mnt/by-id/forbidden 2>/dev/null; then exit 90; fi; printf shared-a > /mnt/shared/probe; printf retained > /mnt/retain/probe; printf deleted > /mnt/delete/probe")
+	sharedA := waitDerivedVolume(t, ctx, client.Volumes(), shared.ID, keyA)
+	owned.volumes[sharedA.ID] = true
 	if err := client.Volumes().Delete(ctx, standalone.ID); err == nil {
 		t.Fatal("deleting a mounted Volume unexpectedly succeeded")
 	}
@@ -71,16 +97,19 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	sandboxSameKey := createE2EVolumeSandbox(t, ctx, client, createdTool.ToolID, keyA)
 	owned.sandboxes = append(owned.sandboxes, sandboxSameKey)
 	runVolumeCommand(t, ctx, sandboxSameKey, "set -eu; test \"$(cat /mnt/shared/probe)\" = shared-a")
+	sharedSameKey := waitDerivedVolume(t, ctx, client.Volumes(), shared.ID, keyA)
+	if sharedSameKey.ID != sharedA.ID {
+		t.Fatalf("same reuse key resolved to different Volumes: %s and %s", sharedA.ID, sharedSameKey.ID)
+	}
 	sandboxOtherKey := createE2EVolumeSandbox(t, ctx, client, createdTool.ToolID, keyB)
 	owned.sandboxes = append(owned.sandboxes, sandboxOtherKey)
 	runVolumeCommand(t, ctx, sandboxOtherKey, "set -eu; test ! -e /mnt/shared/probe; printf shared-b > /mnt/shared/probe")
 
-	sharedA := waitDerivedVolume(t, ctx, client.Volumes(), shared.ID, keyA)
 	sharedB := waitDerivedVolume(t, ctx, client.Volumes(), shared.ID, keyB)
 	if sharedA.ID == sharedB.ID {
 		t.Fatalf("different reuse keys resolved to one Volume: %s", sharedA.ID)
 	}
-	owned.volumes[sharedA.ID], owned.volumes[sharedB.ID] = true, true
+	owned.volumes[sharedB.ID] = true
 	deleteB := waitDerivedVolume(t, ctx, client.Volumes(), deleted.ID, keyB)
 	retainB := waitDerivedVolume(t, ctx, client.Volumes(), retained.ID, keyB)
 	owned.volumes[deleteB.ID], owned.volumes[retainB.ID] = true, true
@@ -102,11 +131,13 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 }
 
 type volumeE2EOwned struct {
-	client    *agr.Client
-	sandboxes []*agr.Sandbox
-	toolID    string
-	volumes   map[string]bool
-	templates map[string]bool
+	client        *agr.Client
+	sandboxes     []*agr.Sandbox
+	bootstrap     *agr.Sandbox
+	bootstrapPath string
+	toolIDs       []string
+	volumes       map[string]bool
+	templates     map[string]bool
 }
 
 func newVolumeE2EOwned(client *agr.Client) *volumeE2EOwned {
@@ -121,10 +152,22 @@ func (o *volumeE2EOwned) cleanup(t *testing.T) {
 		deleteOneVolumeSandbox(t, o.client.Sandboxes(), o.sandboxes[index])
 	}
 	o.sandboxes = nil
-	if o.toolID != "" {
-		deleteToolAndConfirm(t, o.client.Tools(), o.toolID)
-		o.toolID = ""
+	if o.bootstrap != nil {
+		if o.bootstrapPath != "" {
+			result, err := o.bootstrap.Commands().Run(cleanup, "sh", agr.CommandOptions{Args: []string{"-lc", "rm -rf -- " + o.bootstrapPath}, User: agr.Root})
+			if err != nil || result.ExitCode != 0 {
+				t.Errorf("remove persistent Volume fixture path: exit=%d err=%v stderr=%s", result.ExitCode, err, result.Stderr)
+			} else {
+				o.bootstrapPath = ""
+			}
+		}
+		deleteOneVolumeSandbox(t, o.client.Sandboxes(), o.bootstrap)
+		o.bootstrap = nil
 	}
+	for index := len(o.toolIDs) - 1; index >= 0; index-- {
+		deleteToolAndConfirm(t, o.client.Tools(), o.toolIDs[index])
+	}
+	o.toolIDs = nil
 	// Retain templates can create Volumes after the first observation. Discover
 	// every derived identity owned by this test before deleting any template.
 	for templateID := range o.templates {

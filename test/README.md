@@ -21,9 +21,11 @@ make test-e2e
 key or a Sandbox instance token. `AGS_E2E_CONTROL_ENDPOINT` optionally overrides the official
 Cloud endpoint for an authorized test environment; omit it for the public endpoint.
 
-The suite is serial (`-p=1`), creates at most five sandboxes, one uniquely named Tool, and one
-uniquely named Deployment, and registers independent cleanup
-for each accepted creation. Cleanup sends Delete and polls until the control plane reports
+The suite is serial (`-p=1`). Each stable journey creates at most five Sandboxes, one uniquely
+named Tool, and one uniquely named Deployment. The Preview persistent-Volume journey creates one
+additional bootstrap Tool/Sandbox to initialize and later remove its dedicated CFS subpath. Every
+journey registers independent cleanup for each accepted creation. Cleanup sends Delete and polls
+until the control plane reports
 `STOPPED` or `NOT_FOUND`. A failed cleanup fails the test. Do not run it against a shared Tool
 unless you are authorized to create and delete test instances.
 
@@ -74,9 +76,11 @@ go test -v -count=1 -run '^TestPersistentVolumeCloudJourney$' .
 ```
 
 The test records the initial Volume and VolumeTemplate ID sets, creates only uniquely named
-resources under `/agr-sdk-e2e/<run-id>`, and cleans up in dependency order. It deletes Sandboxes,
-its Tool, derived and standalone Volumes, and then its VolumeTemplates; it never deletes the CFS
-file system or reuses an unreviewed account resource. Missing fixture variables fail before any
+resources under `/agr-sdk-e2e/<run-id>`, and cleans up in dependency order. A bootstrap mount of
+the CFS root creates that unique subpath before Volume creation and removes only that subpath at
+the end. The test deletes Sandboxes, its Tools, derived and standalone Volumes, and then its
+VolumeTemplates; it never deletes the CFS file system or reuses an unreviewed account resource.
+Missing fixture variables fail before any
 network request instead of selecting an existing resource from List.
 
 The explicit-client journey covers Files, streamed upload/read, Watch, Commands Run/List/Connect,

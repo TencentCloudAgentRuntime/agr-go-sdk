@@ -372,7 +372,7 @@ func cloudError(err error, operation string) error {
 			code, reason, retryable = model.PermissionDenied, "CLOUD_PERMISSION_DENIED", false
 		case strings.Contains(value, "notfound") || strings.Contains(value, "notexist"):
 			code, reason, retryable = model.NotFound, "RESOURCE_NOT_FOUND", false
-		case strings.Contains(value, "conflict") || strings.Contains(value, "incorrectstate"):
+		case strings.Contains(value, "conflict") || strings.Contains(value, "incorrectstate") || strings.Contains(value, "resourceinuse"):
 			code, reason, retryable = model.Conflict, "RESOURCE_CONFLICT", false
 		case strings.Contains(value, "limitexceeded") || strings.Contains(value, "requestlimit"):
 			code, reason = model.ResourceExhausted, "REQUEST_LIMIT_EXCEEDED"

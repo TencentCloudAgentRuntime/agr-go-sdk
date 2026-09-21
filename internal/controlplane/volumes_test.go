@@ -59,6 +59,28 @@ func TestCommonVolumeRejectsMalformedCollections(t *testing.T) {
 	}
 }
 
+func TestCommonVolumeTemplateRejectsMalformedCollectionAndStorage(t *testing.T) {
+	tests := []map[string]any{
+		{"VolumeTemplateSet": "bad", "TotalCount": 0, "RequestId": "r"},
+		{"VolumeTemplateSet": []any{map[string]any{
+			"VolumeTemplateId": "volt", "VolumeTemplateName": "template", "AccessMode": "ReadWriteMany", "ReclaimPolicy": "Retain", "Status": "ACTIVE", "StorageType": "Cfs",
+			"StorageSpec": map[string]any{"Cos": map[string]any{"Endpoint": "e", "BucketName": "b", "BucketPathPattern": "p"}},
+		}}, "TotalCount": 1, "RequestId": "r"},
+	}
+	for _, response := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"Response": response})
+		}))
+		api := NewAGS(Config{Region: "ap-test", Endpoint: server.URL, Timeout: time.Second, Transport: server.Client().Transport}, func(context.Context) (Credential, error) { return Credential{SecretID: "id", SecretKey: "key"}, nil })
+		_, err := api.ListVolumeTemplates(context.Background(), VolumeListRequest{Limit: 1})
+		server.Close()
+		var cloud *Error
+		if !errors.As(err, &cloud) || cloud.Code != "ClientError.MalformedResponse" {
+			t.Fatalf("response=%#v error=%#v", response, err)
+		}
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }

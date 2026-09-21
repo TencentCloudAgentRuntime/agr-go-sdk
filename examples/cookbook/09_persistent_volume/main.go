@@ -28,6 +28,43 @@ func run() error {
 
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	basePath := "/agr-sdk-cookbook/" + suffix
+	bootstrapTool, err := client.Tools().Create(ctx, agr.CreateToolOptions{
+		Name:    "agr-sdk-volume-bootstrap-" + suffix,
+		Type:    agr.ToolType(toolType),
+		Network: agr.ToolNetworkConfiguration{Mode: agr.ToolNetworkPublic},
+		RoleARN: os.Getenv("AGR_VOLUME_TOOL_ROLE_ARN"),
+		StorageMounts: []agr.ToolStorageMount{{
+			Name: "bootstrap", MountPath: "/mnt/bootstrap",
+			Source: &agr.ToolStorageSource{CFS: &agr.ToolCFSStorage{FileSystemID: fileSystemID, Path: "/"}},
+		}},
+	})
+	if err != nil {
+		return err
+	}
+	defer deleteTool(client.Tools(), bootstrapTool.ToolID)
+	if _, err = client.Tools().WaitFor(ctx, bootstrapTool.ToolID, agr.ToolActive); err != nil {
+		return err
+	}
+	lifetime := 5 * time.Minute
+	bootstrap, err := client.Sandboxes().Create(ctx, agr.CreateOptions{
+		Tool: agr.ToolRef{ID: bootstrapTool.ToolID}, Timeout: &lifetime,
+		Metadata: map[string]string{"session_id": "bootstrap-" + suffix},
+	})
+	if err != nil {
+		return err
+	}
+	defer bootstrap.Close()
+	defer deleteSandbox(bootstrap)
+	fixturePath := "/mnt/bootstrap" + basePath
+	defer removeFixturePath(bootstrap, fixturePath)
+	initialized, err := bootstrap.Commands().Run(ctx, "sh", agr.CommandOptions{Args: []string{"-lc", "mkdir -p -- " + fixturePath + "/direct " + fixturePath + "/" + suffix + "; chmod -R 0777 -- " + fixturePath}, User: agr.Root})
+	if err != nil || initialized.ExitCode != 0 {
+		if err == nil {
+			err = fmt.Errorf("initialize CFS fixture: exit %d", initialized.ExitCode)
+		}
+		return err
+	}
+
 	volume, err := client.Volumes().Create(ctx, agr.CreateVolumeOptions{
 		Name:        "agr-sdk-volume-" + suffix,
 		AccessMode:  agr.VolumeReadWriteMany,
@@ -79,7 +116,6 @@ func run() error {
 		return err
 	}
 
-	lifetime := 5 * time.Minute
 	sandbox, err := client.Sandboxes().Create(ctx, agr.CreateOptions{
 		Tool:     agr.ToolRef{ID: tool.ToolID},
 		Timeout:  &lifetime,
@@ -96,6 +132,12 @@ func run() error {
 	}
 	fmt.Println(string(result.Stdout))
 	return nil
+}
+
+func removeFixturePath(sandbox *agr.Sandbox, path string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	_, _ = sandbox.Commands().Run(ctx, "sh", agr.CommandOptions{Args: []string{"-lc", "rm -rf -- " + path}, User: agr.Root})
 }
 
 func deleteSandbox(sandbox *agr.Sandbox) {

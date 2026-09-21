@@ -134,6 +134,26 @@ func TestVolumeGetRequiresExactSingleMatch(t *testing.T) {
 	}
 }
 
+func TestVolumeTemplateGetRequiresExactSingleMatch(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		items []any
+	}{{"zero", []any{}}, {"multiple", []any{volumeTemplateJSON("volt-want", "ACTIVE"), volumeTemplateJSON("volt-other", "ACTIVE")}}, {"mismatch", []any{volumeTemplateJSON("volt-other", "ACTIVE")}}} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_ = json.NewEncoder(w).Encode(map[string]any{"Response": map[string]any{"VolumeTemplateSet": tc.items, "TotalCount": len(tc.items), "RequestId": "r"}})
+			}))
+			defer server.Close()
+			client, _ := NewClient(WithRegion("ap-test"), WithCredential(CloudCredential{"id", "key"}), WithControlPlaneEndpoint(server.URL), WithHTTPClient(server.Client()))
+			_, err := client.VolumeTemplates().Get(context.Background(), "volt-want")
+			var failure *Error
+			if !errors.As(err, &failure) || failure.Code != NotFound || failure.ResourceType != "volume_template" || failure.ResourceID != "volt-want" {
+				t.Fatalf("error=%#v", err)
+			}
+		})
+	}
+}
+
 func TestVolumeInvalidInputsMakeNoNetworkCallsAndCopyInputs(t *testing.T) {
 	var calls atomic.Int32
 	client, _ := NewClient(WithRegion("ap-test"), WithCredential(CloudCredential{"id", "key"}), WithHTTPClient(&http.Client{Transport: roundTripFuncRoot(func(*http.Request) (*http.Response, error) {
@@ -165,6 +185,87 @@ func TestVolumeInvalidInputsMakeNoNetworkCallsAndCopyInputs(t *testing.T) {
 	tags[0].Value, storage.FileSystemID = "after", "after"
 	if copy.Tags[0].Value != "before" || copy.Storage.CFS.FileSystemID != "before" {
 		t.Fatal("Volume options retained caller memory")
+	}
+}
+
+func TestVolumeTemplateInvalidInputsMakeNoNetworkCallsAndCopyInputs(t *testing.T) {
+	var calls atomic.Int32
+	client, _ := NewClient(WithRegion("ap-test"), WithCredential(CloudCredential{"id", "key"}), WithHTTPClient(&http.Client{Transport: roundTripFuncRoot(func(*http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return nil, errors.New("network")
+	})}))
+	invalid := []CreateVolumeTemplateOptions{
+		{Name: "", AccessMode: VolumeReadWriteMany, ReclaimPolicy: VolumeReclaimRetain, StorageType: VolumeStorageCFS, Storage: VolumeTemplateStorage{CFS: &VolumeTemplateCFSStorage{FileSystemID: "cfs", PathPattern: "/${reuse_key}"}}},
+		{Name: "x", AccessMode: VolumeReadWriteMany, ReclaimPolicy: "future", StorageType: VolumeStorageCFS, Storage: VolumeTemplateStorage{CFS: &VolumeTemplateCFSStorage{FileSystemID: "cfs", PathPattern: "/${reuse_key}"}}},
+		{Name: "x", AccessMode: VolumeReadWriteMany, ReclaimPolicy: VolumeReclaimRetain, StorageType: VolumeStorageCFS, Storage: VolumeTemplateStorage{COS: &VolumeTemplateCOSStorage{Endpoint: "e", BucketName: "b", BucketPathPattern: "p"}}},
+	}
+	for _, value := range invalid {
+		if _, err := client.VolumeTemplates().Create(context.Background(), value); err == nil {
+			t.Fatalf("accepted invalid template create: %#v", value)
+		}
+	}
+	tooMany := make([]string, 101)
+	for index := range tooMany {
+		tooMany[index] = "volt"
+	}
+	if _, err := client.VolumeTemplates().List(context.Background(), VolumeTemplateListOptions{IDs: tooMany}); err == nil {
+		t.Fatal("accepted too many template IDs")
+	}
+	if _, err := client.VolumeTemplates().Update(context.Background(), "volt", UpdateVolumeTemplateOptions{}); err == nil {
+		t.Fatal("accepted empty template update")
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("invalid template inputs made %d calls", calls.Load())
+	}
+	tags := []VolumeTag{{Key: "owner", Value: "before"}}
+	storage := &VolumeTemplateCFSStorage{FileSystemID: "before", PathPattern: "/before/${reuse_key}"}
+	copied := copyCreateVolumeTemplateOptions(CreateVolumeTemplateOptions{Tags: tags, Storage: VolumeTemplateStorage{CFS: storage}})
+	tags[0].Value, storage.FileSystemID = "after", "after"
+	if copied.Tags[0].Value != "before" || copied.Storage.CFS.FileSystemID != "before" {
+		t.Fatal("VolumeTemplate options retained caller memory")
+	}
+	capacity := "before"
+	update := copyUpdateVolumeTemplateOptions(UpdateVolumeTemplateOptions{Tags: &tags, DefaultCapacity: &capacity})
+	tags[0].Value, capacity = "later", "later"
+	if (*update.Tags)[0].Value != "after" || *update.DefaultCapacity != "before" {
+		t.Fatal("VolumeTemplate update options retained caller memory")
+	}
+}
+
+func TestVolumeListDefaultsAndMountedDeleteConflict(t *testing.T) {
+	var bodies []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		bodies = append(bodies, body)
+		response := map[string]any{"RequestId": "request-volume"}
+		switch r.Header.Get("X-TC-Action") {
+		case "DescribeVolumeList":
+			response["VolumeSet"], response["TotalCount"] = []any{}, 0
+		case "DescribeVolumeTemplateList":
+			response["VolumeTemplateSet"], response["TotalCount"] = []any{}, 0
+		case "DeleteVolume":
+			response["Error"] = map[string]any{"Code": "ResourceInUse.VolumeMounted", "Message": "mounted"}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"Response": response})
+	}))
+	defer server.Close()
+	client, _ := NewClient(WithRegion("ap-test"), WithCredential(CloudCredential{"id", "key"}), WithControlPlaneEndpoint(server.URL), WithHTTPClient(server.Client()))
+	if _, err := client.Volumes().List(context.Background(), VolumeListOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.VolumeTemplates().List(context.Background(), VolumeTemplateListOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 2; index++ {
+		if bodies[index]["Offset"] != float64(0) || bodies[index]["Limit"] != float64(20) {
+			t.Fatalf("default page request=%#v", bodies[index])
+		}
+	}
+	err := client.Volumes().Delete(context.Background(), "vol-mounted")
+	var failure *Error
+	if !errors.As(err, &failure) || failure.Code != Conflict || failure.ResourceType != "volume" || failure.ResourceID != "vol-mounted" {
+		t.Fatalf("mounted delete error=%#v", err)
 	}
 }
 
