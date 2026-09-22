@@ -72,6 +72,13 @@ func TestRegistryCloudJourney(t *testing.T) {
 	if recordID == "" || versionID == "" {
 		t.Fatalf("unsafe Record result: %+v", createdRecord)
 	}
+	recordPage, err := records.List(ctx, agr.RegistryRecordListOptions{
+		Limit:   10,
+		Filters: []agr.RegistryFilter{{Name: "name", Values: []string{createdRecord.Record.Name}}},
+	})
+	if err != nil || !hasRegistryRecord(recordPage.Items, recordID) {
+		t.Fatalf("List Registry Record: %+v err=%v", recordPage, err)
+	}
 	approved, err := records.Approve(ctx, recordID, versionID, "agr-sdk e2e")
 	if err != nil || string(approved.Status) != "APPROVED" {
 		t.Fatalf("Approve: %+v err=%v", approved, err)
@@ -124,6 +131,16 @@ func hasRegistry(values []agr.RegistryInfo, id string) bool {
 	}
 	return false
 }
+
+func hasRegistryRecord(values []agr.RegistryRecordInfo, id string) bool {
+	for _, value := range values {
+		if value.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
 func waitForRegistryAuditLogs(ctx context.Context, manager *agr.RegistryRecordManager, recordID string) (agr.RegistryAuditLogPage, error) {
 	var page agr.RegistryAuditLogPage
 	var err error
