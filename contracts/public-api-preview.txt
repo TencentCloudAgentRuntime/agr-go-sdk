@@ -44,6 +44,11 @@ const DefaultMaxOutputBytes int64 = 4 << 20
     DefaultMaxOutputBytes limits each retained command-output stream to 4 MiB
     when no explicit limit is supplied.
 
+const DefaultMaxRegistrySkillPackageBytes int64 = 64 << 20
+    DefaultMaxRegistrySkillPackageBytes is the SDK safety limit used when
+    a package transfer leaves MaxBytes unset. It is not a statement of the
+    service-side package limit.
+
 const DefaultWatchBuffer = 32
     DefaultWatchBuffer is the pending-event capacity when WatchOptions.Buffer is
     zero.
@@ -1898,6 +1903,12 @@ func (m *RegistryRecordManager) Delete(ctx context.Context, recordID string, opt
     Delete deletes the Record when Version is nil or exactly one Version when
     supplied.
 
+func (m *RegistryRecordManager) DownloadSkillPackage(ctx context.Context, recordID string, selector *RegistryVersionSelector, dst io.Writer, opts RegistrySkillPackageDownloadOptions) (RegistrySkillPackageDownloadResult, error)
+    DownloadSkillPackage streams and verifies one READY TAR_PACKAGE Version.
+    Nil selector uses the Stable service default. A failed call may have written
+    a prefix to dst; use a temporary file when atomic replacement is required.
+    The SDK does not extract the archive.
+
 func (m *RegistryRecordManager) Get(ctx context.Context, recordID string, selector *RegistryVersionSelector) (RegistryRecordResult, error)
     Get returns a Record and one resolved Version. Nil selector means stable.
 
@@ -1923,6 +1934,13 @@ func (m *RegistryRecordManager) Sync(ctx context.Context, recordID string, selec
 func (m *RegistryRecordManager) Update(ctx context.Context, recordID string, opts UpdateRegistryRecordOptions) (RegistryRecordResult, error)
     Update changes Record metadata/labels or creates one new Version without
     automatic retry.
+
+func (m *RegistryRecordManager) UploadSkillPackage(ctx context.Context, recordID, versionID string, body io.Reader, opts RegistrySkillPackageUploadOptions) (RegistrySkillPackageUploadResult, error)
+    UploadSkillPackage streams one gzip tar archive to an existing TAR_PACKAGE
+    Version. The SDK obtains and consumes the short-lived upload URL internally
+    and never returns it. The upload is not retried. Success means the bytes
+    were accepted by object storage; call Get to observe the service's
+    asynchronous ContentStatus transition to READY.
 
 type RegistryRecordPage struct {
 	// Items contains Record snapshots.
@@ -2016,14 +2034,56 @@ type RegistryRecordVersionPage struct {
 }
     RegistryRecordVersionPage is one service-reported Version page.
 
+type RegistrySkillPackageDownloadOptions struct {
+	// MaxBytes is a caller safety limit. Zero uses DefaultMaxRegistrySkillPackageBytes.
+	MaxBytes int64
+}
+    RegistrySkillPackageDownloadOptions bounds one streaming package download.
+
+type RegistrySkillPackageDownloadResult struct {
+	// ResolvedVersionID is the exact Version selected by VersionID, Label, or Stable default.
+	ResolvedVersionID string
+	// SizeBytes is the number of bytes written.
+	SizeBytes int64
+	// SHA256 is the lowercase service digest verified against the downloaded bytes.
+	SHA256 string
+	// RequestID correlates the URL-issuance control-plane request.
+	RequestID string
+}
+    RegistrySkillPackageDownloadResult reports a verified package transfer.
+
+type RegistrySkillPackageUploadOptions struct {
+	// SizeBytes is the exact number of bytes uploaded and must be positive. Bytes after this
+	// declared length remain unread.
+	SizeBytes int64
+	// MaxBytes is a caller safety limit. Zero uses DefaultMaxRegistrySkillPackageBytes.
+	MaxBytes int64
+}
+    RegistrySkillPackageUploadOptions bounds one streaming gzip tar upload.
+
+type RegistrySkillPackageUploadResult struct {
+	// Version is the existing TAR_PACKAGE Version selected for upload.
+	Version RegistryRecordVersionInfo
+	// ContentStatus is the status reported when the service issued the upload attempt.
+	ContentStatus string
+	// SizeBytes is the number of bytes sent.
+	SizeBytes int64
+	// SHA256 is the lowercase digest computed while streaming the upload.
+	SHA256 string
+	// RequestID correlates the URL-issuance control-plane request.
+	RequestID string
+}
+    RegistrySkillPackageUploadResult reports local transfer evidence without
+    exposing the signed URL.
+
 type RegistrySkillSource struct {
-	// Type must be MANUAL in A5a.
+	// Type selects MANUAL or TAR_PACKAGE.
 	Type RegistrySourceType
-	// SkillMD contains bounded inline SKILL.md text.
+	// SkillMD contains bounded inline SKILL.md text for MANUAL and must be empty for TAR_PACKAGE.
 	SkillMD string
 }
-    RegistrySkillSource supplies inline SKILL.md content. Package transfer is
-    not in A5a.
+    RegistrySkillSource supplies inline SKILL.md content or declares a gzip tar
+    package upload.
 
 type RegistrySourceType string
     RegistrySourceType identifies how descriptor content is supplied.
@@ -2033,7 +2093,7 @@ const (
 	RegistrySourceManual RegistrySourceType = "MANUAL"
 	// RegistrySourceURLImport asks the service to import an explicit HTTPS endpoint.
 	RegistrySourceURLImport RegistrySourceType = "URL_IMPORT"
-	// RegistrySourceTarPackage is reserved for the separately released package-transfer API.
+	// RegistrySourceTarPackage creates a Version whose gzip tar content is uploaded separately.
 	RegistrySourceTarPackage RegistrySourceType = "TAR_PACKAGE"
 )
 type RegistryStatus string

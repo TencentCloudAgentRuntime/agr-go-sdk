@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -671,6 +672,22 @@ func (c *controlAdapter) SyncRegistryRecord(ctx context.Context, registryID, rec
 		result.Record = &value
 	}
 	return result, nil
+}
+
+func (c *controlAdapter) UploadRegistrySkillPackage(ctx context.Context, registryID, recordID, versionID string, body io.Reader, size, max int64) (RegistrySkillPackageUploadResult, error) {
+	out, err := c.service.UploadRegistrySkillPackage(ctx, registryID, recordID, versionID, body, size, max)
+	if err != nil {
+		return RegistrySkillPackageUploadResult{}, withResourceError(normalizeError("Registries.Records.UploadSkillPackage", err), "registry_record", recordID)
+	}
+	return RegistrySkillPackageUploadResult{Version: registryVersionInfoFrom(out.Version, out.RequestID), ContentStatus: out.ContentStatus, SizeBytes: out.SizeBytes, SHA256: out.SHA256, RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) DownloadRegistrySkillPackage(ctx context.Context, registryID, recordID string, selector *RegistryVersionSelector, dst io.Writer, max int64) (RegistrySkillPackageDownloadResult, error) {
+	out, err := c.service.DownloadRegistrySkillPackage(ctx, registryID, recordID, controlRegistrySelector(selector), dst, max)
+	if err != nil {
+		return RegistrySkillPackageDownloadResult{}, withResourceError(normalizeError("Registries.Records.DownloadSkillPackage", err), "registry_record", recordID)
+	}
+	return RegistrySkillPackageDownloadResult{ResolvedVersionID: out.ResolvedVersionID, SizeBytes: out.SizeBytes, SHA256: out.SHA256, RequestID: out.RequestID}, nil
 }
 
 func (c *controlAdapter) ListRegistryAuditLogs(ctx context.Context, registryID string, opts RegistryAuditLogListOptions) (RegistryAuditLogPage, error) {

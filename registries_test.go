@@ -1,9 +1,11 @@
 package agr
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -92,6 +94,18 @@ func (c *registryTestControl) ListRegistryAuditLogs(_ context.Context, registryI
 	c.registryID, c.audit = registryID, in
 	return RegistryAuditLogPage{}, nil
 }
+func (c *registryTestControl) UploadRegistrySkillPackage(_ context.Context, registryID, recordID, versionID string, body io.Reader, size, _ int64) (RegistrySkillPackageUploadResult, error) {
+	c.calls++
+	c.registryID = registryID
+	_, _ = io.Copy(io.Discard, io.LimitReader(body, size))
+	return RegistrySkillPackageUploadResult{Version: RegistryRecordVersionInfo{ID: versionID, RecordID: recordID}, SizeBytes: size, SHA256: strings.Repeat("0", 64)}, nil
+}
+func (c *registryTestControl) DownloadRegistrySkillPackage(_ context.Context, registryID, recordID string, selector *RegistryVersionSelector, dst io.Writer, _ int64) (RegistrySkillPackageDownloadResult, error) {
+	c.calls++
+	c.registryID, c.selector = registryID, selector
+	_, _ = io.WriteString(dst, "package")
+	return RegistrySkillPackageDownloadResult{ResolvedVersionID: recordID, SizeBytes: 7, SHA256: strings.Repeat("0", 64)}, nil
+}
 
 func newRegistryTestClient(t *testing.T, control *registryTestControl) *Client {
 	t.Helper()
@@ -154,6 +168,7 @@ func TestRegistrySourceUnionAndPackageBoundary(t *testing.T) {
 		{Name: "agui-manual", DescriptorType: RegistryDescriptorAGUI, AgentSource: &RegistryAgentSource{Type: RegistrySourceManual, Descriptors: json.RawMessage(`{"name":"ui"}`)}},
 		{Name: "custom", DescriptorType: RegistryDescriptorCustom, CustomDescriptors: json.RawMessage(`{"name":"custom"}`)},
 		{Name: "skill", DescriptorType: RegistryDescriptorAgentSkills, SkillSource: &RegistrySkillSource{Type: RegistrySourceManual, SkillMD: "# Skill"}},
+		{Name: "skill-package", DescriptorType: RegistryDescriptorAgentSkills, SkillSource: &RegistrySkillSource{Type: RegistrySourceTarPackage}},
 	}
 	for _, input := range valid {
 		if _, err := records.Create(ctx, input); err != nil {
@@ -165,13 +180,40 @@ func TestRegistrySourceUnionAndPackageBoundary(t *testing.T) {
 	if _, err := records.Create(ctx, invalid); err == nil {
 		t.Fatal("multiple sources accepted")
 	}
-	_, err := records.Create(ctx, CreateRegistryRecordOptions{Name: "skill", DescriptorType: RegistryDescriptorAgentSkills, SkillSource: &RegistrySkillSource{Type: RegistrySourceTarPackage}})
+	_, err := records.Create(ctx, CreateRegistryRecordOptions{Name: "skill", DescriptorType: RegistryDescriptorAgentSkills, SkillSource: &RegistrySkillSource{Type: RegistrySourceTarPackage, SkillMD: "must-be-empty"}})
 	var sdk *Error
-	if !errors.As(err, &sdk) || sdk.Code != Unsupported || sdk.Reason != "SKILL_PACKAGE_TRANSFER_UNAVAILABLE" {
-		t.Fatalf("package error=%#v", err)
+	if !errors.As(err, &sdk) || sdk.Code != InvalidArgument || sdk.Reason != "SKILL_SOURCE_INVALID" {
+		t.Fatalf("package source error=%#v", err)
 	}
 	if control.calls != len(valid) {
 		t.Fatalf("invalid sources reached transport: %d", control.calls)
+	}
+}
+
+func TestRegistrySkillPackagePublicBoundary(t *testing.T) {
+	control := &registryTestControl{}
+	records := newRegistryTestClient(t, control).Registries().Records("reg")
+	payload := []byte("package")
+	upload, err := records.UploadSkillPackage(context.Background(), "rec", "rv-1", bytes.NewReader(payload), RegistrySkillPackageUploadOptions{SizeBytes: int64(len(payload))})
+	if err != nil || upload.Version.ID != "rv-1" || upload.SizeBytes != int64(len(payload)) {
+		t.Fatalf("upload=%+v err=%v", upload, err)
+	}
+	selector := &RegistryVersionSelector{Label: "stable"}
+	var destination bytes.Buffer
+	download, err := records.DownloadSkillPackage(context.Background(), "rec", selector, &destination, RegistrySkillPackageDownloadOptions{MaxBytes: 8})
+	selector.Label = "changed"
+	if err != nil || destination.String() != "package" || download.SizeBytes != 7 || control.selector == nil || control.selector.Label != "stable" {
+		t.Fatalf("download=%+v destination=%q selector=%+v err=%v", download, destination.String(), control.selector, err)
+	}
+	before := control.calls
+	_, err = records.UploadSkillPackage(context.Background(), "rec", "rv-1", bytes.NewReader(payload), RegistrySkillPackageUploadOptions{SizeBytes: 9, MaxBytes: 8})
+	var sdk *Error
+	if !errors.As(err, &sdk) || sdk.Code != ResourceExhausted || sdk.Retryable || control.calls != before {
+		t.Fatalf("oversize error=%v calls=%d", err, control.calls)
+	}
+	_, err = records.DownloadSkillPackage(context.Background(), "rec", &RegistryVersionSelector{}, &destination, RegistrySkillPackageDownloadOptions{})
+	if !errors.As(err, &sdk) || sdk.Code != InvalidArgument || control.calls != before {
+		t.Fatalf("selector error=%v calls=%d", err, control.calls)
 	}
 }
 
@@ -293,7 +335,7 @@ func TestRegistryJSONLimitAndURLValidation(t *testing.T) {
 }
 
 func TestRegistryPublicModelsExcludePackageURLs(t *testing.T) {
-	for _, value := range []any{CreateRegistryRecordOptions{}, UpdateRegistryRecordOptions{}, RegistryRecordResult{}, RegistrySyncResult{}} {
+	for _, value := range []any{CreateRegistryRecordOptions{}, UpdateRegistryRecordOptions{}, RegistryRecordResult{}, RegistrySyncResult{}, RegistrySkillPackageUploadOptions{}, RegistrySkillPackageUploadResult{}, RegistrySkillPackageDownloadOptions{}, RegistrySkillPackageDownloadResult{}} {
 		typeOf := reflect.TypeOf(value)
 		for i := 0; i < typeOf.NumField(); i++ {
 			name := typeOf.Field(i).Name

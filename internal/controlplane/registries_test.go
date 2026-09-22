@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func TestRegistryCommonRequestMappingCoversAllA5aActions(t *testing.T) {
+func TestRegistryCommonRequestMappingCoversAllActions(t *testing.T) {
 	var mu sync.Mutex
 	bodies := map[string][]map[string]any{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,8 +80,14 @@ func TestRegistryCommonRequestMappingCoversAllA5aActions(t *testing.T) {
 	if _, err := api.ListRegistryAuditLogs(ctx, reg, RegistryAuditLogRequest{RecordID: rec, Limit: 1}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := api.GetRegistrySkillPackageUploadURL(ctx, reg, rec, ver); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.GetRegistrySkillPackageDownloadURL(ctx, reg, rec, &RegistrySelector{Label: "stable"}); err != nil {
+		t.Fatal(err)
+	}
 
-	want := []string{"ApproveRegistryRecord", "CancelRegistryRecord", "CreateRegistry", "CreateRegistryRecord", "DeleteRegistry", "DeleteRegistryRecord", "DescribeRegistry", "DescribeRegistryAuditLogList", "DescribeRegistryList", "DescribeRegistryRecord", "DescribeRegistryRecordList", "DescribeRegistryRecordVersionList", "PreviewRegistryRecord", "RejectRegistryRecord", "SyncRegistryRecord", "UpdateRegistry", "UpdateRegistryRecord"}
+	want := []string{"ApproveRegistryRecord", "CancelRegistryRecord", "CreateRegistry", "CreateRegistryRecord", "DeleteRegistry", "DeleteRegistryRecord", "DescribeRegistry", "DescribeRegistryAuditLogList", "DescribeRegistryList", "DescribeRegistryRecord", "DescribeRegistryRecordList", "DescribeRegistryRecordVersionList", "GetSkillPackageDownloadURL", "GetSkillPackageUploadURL", "PreviewRegistryRecord", "RejectRegistryRecord", "SyncRegistryRecord", "UpdateRegistry", "UpdateRegistryRecord"}
 	for _, action := range want {
 		if len(bodies[action]) == 0 {
 			t.Errorf("missing request for %s", action)
@@ -111,6 +117,12 @@ func TestRegistryCommonRequestMappingCoversAllA5aActions(t *testing.T) {
 	if _, leaked := bodies["DescribeRegistryAuditLogList"][0]["RecordID"]; leaked {
 		t.Fatalf("Go acronym leaked into wire request: %#v", bodies["DescribeRegistryAuditLogList"][0])
 	}
+	if got := bodies["GetSkillPackageUploadURL"][0]["VersionId"]; got != ver {
+		t.Fatalf("upload VersionId mapping lost: %#v", bodies["GetSkillPackageUploadURL"][0])
+	}
+	if got := bodies["GetSkillPackageDownloadURL"][0]["Label"]; got != "stable" {
+		t.Fatalf("download selector mapping lost: %#v", bodies["GetSkillPackageDownloadURL"][0])
+	}
 }
 
 func TestRegistrySourceInputsAreEncodedOnce(t *testing.T) {
@@ -127,6 +139,7 @@ func TestRegistrySourceInputsAreEncodedOnce(t *testing.T) {
 		{Name: "mcp", DescriptorType: "MCP", MCPSource: &RegistrySource{Type: "MANUAL", Descriptors: json.RawMessage(`{"name":"mcp"}`)}},
 		{Name: "a2a", DescriptorType: "A2A", AgentSource: &RegistrySource{Type: "URL_IMPORT", EndpointURL: "https://example.invalid/agent.json"}},
 		{Name: "skill", DescriptorType: "AGENT_SKILLS", SkillSource: &RegistrySkillSource{Type: "MANUAL", SkillMD: "# Skill"}},
+		{Name: "skill-package", DescriptorType: "AGENT_SKILLS", SkillSource: &RegistrySkillSource{Type: "TAR_PACKAGE"}},
 	}
 	for _, request := range requests {
 		if _, err := api.CreateRegistryRecord(context.Background(), "reg", request); err != nil {
@@ -141,6 +154,9 @@ func TestRegistrySourceInputsAreEncodedOnce(t *testing.T) {
 	}
 	if got := bodies[2]["SkillSource"].(map[string]any)["SkillMd"]; got != "# Skill" {
 		t.Fatalf("SkillMd=%#v", got)
+	}
+	if source := bodies[3]["SkillSource"].(map[string]any); source["Type"] != "TAR_PACKAGE" || source["SkillMd"] != nil {
+		t.Fatalf("TAR package source=%#v", source)
 	}
 }
 
@@ -198,6 +214,10 @@ func registryResponseForAction(action string) map[string]any {
 		response["SyncStatus"], response["ResolvedVersionId"], response["LastSyncTime"] = "UNCHANGED", "rv-12345678", "2026-09-22T01:02:05Z"
 	case "DescribeRegistryAuditLogList":
 		response["AuditLogSet"], response["TotalCount"] = []any{map[string]any{"AuditLogId": "log-1", "RegistryId": "reg-12345678", "RecordId": "rec-12345678", "Actor": "10001", "Action": "record.create", "Details": `{"safe":true}`, "CreateTime": "2026-09-22T01:02:05Z"}}, 1
+	case "GetSkillPackageUploadURL":
+		response["Version"], response["UploadURL"], response["ContentStatus"], response["ExpireTime"] = validRegistryVersionResponse(), "https://cos.example.test/upload?signature=private", "UPLOADING", "2026-09-22T01:07:05Z"
+	case "GetSkillPackageDownloadURL":
+		response["DownloadURL"], response["ExpireTime"], response["SHA256"], response["ResolvedVersionId"] = "https://cos.example.test/download?signature=private", "2026-09-22T01:07:05Z", strings.Repeat("0", 64), "rv-12345678"
 	}
 	return response
 }

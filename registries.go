@@ -3,6 +3,7 @@ package agr
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/url"
 	"regexp"
 	"strings"
@@ -11,6 +12,10 @@ import (
 )
 
 const maxRegistryJSONBytes = 1 << 20
+
+// DefaultMaxRegistrySkillPackageBytes is the SDK safety limit used when a package transfer
+// leaves MaxBytes unset. It is not a statement of the service-side package limit.
+const DefaultMaxRegistrySkillPackageBytes int64 = 64 << 20
 
 var registryLabelPattern = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,62}$`)
 
@@ -51,7 +56,7 @@ const (
 	RegistrySourceManual RegistrySourceType = "MANUAL"
 	// RegistrySourceURLImport asks the service to import an explicit HTTPS endpoint.
 	RegistrySourceURLImport RegistrySourceType = "URL_IMPORT"
-	// RegistrySourceTarPackage is reserved for the separately released package-transfer API.
+	// RegistrySourceTarPackage creates a Version whose gzip tar content is uploaded separately.
 	RegistrySourceTarPackage RegistrySourceType = "TAR_PACKAGE"
 )
 
@@ -184,11 +189,11 @@ type RegistryAgentSource struct {
 	EndpointURL string
 }
 
-// RegistrySkillSource supplies inline SKILL.md content. Package transfer is not in A5a.
+// RegistrySkillSource supplies inline SKILL.md content or declares a gzip tar package upload.
 type RegistrySkillSource struct {
-	// Type must be MANUAL in A5a.
+	// Type selects MANUAL or TAR_PACKAGE.
 	Type RegistrySourceType
-	// SkillMD contains bounded inline SKILL.md text.
+	// SkillMD contains bounded inline SKILL.md text for MANUAL and must be empty for TAR_PACKAGE.
 	SkillMD string
 }
 
@@ -505,6 +510,47 @@ type RegistrySyncResult struct {
 	RequestID string
 }
 
+// RegistrySkillPackageUploadOptions bounds one streaming gzip tar upload.
+type RegistrySkillPackageUploadOptions struct {
+	// SizeBytes is the exact number of bytes uploaded and must be positive. Bytes after this
+	// declared length remain unread.
+	SizeBytes int64
+	// MaxBytes is a caller safety limit. Zero uses DefaultMaxRegistrySkillPackageBytes.
+	MaxBytes int64
+}
+
+// RegistrySkillPackageUploadResult reports local transfer evidence without exposing the signed URL.
+type RegistrySkillPackageUploadResult struct {
+	// Version is the existing TAR_PACKAGE Version selected for upload.
+	Version RegistryRecordVersionInfo
+	// ContentStatus is the status reported when the service issued the upload attempt.
+	ContentStatus string
+	// SizeBytes is the number of bytes sent.
+	SizeBytes int64
+	// SHA256 is the lowercase digest computed while streaming the upload.
+	SHA256 string
+	// RequestID correlates the URL-issuance control-plane request.
+	RequestID string
+}
+
+// RegistrySkillPackageDownloadOptions bounds one streaming package download.
+type RegistrySkillPackageDownloadOptions struct {
+	// MaxBytes is a caller safety limit. Zero uses DefaultMaxRegistrySkillPackageBytes.
+	MaxBytes int64
+}
+
+// RegistrySkillPackageDownloadResult reports a verified package transfer.
+type RegistrySkillPackageDownloadResult struct {
+	// ResolvedVersionID is the exact Version selected by VersionID, Label, or Stable default.
+	ResolvedVersionID string
+	// SizeBytes is the number of bytes written.
+	SizeBytes int64
+	// SHA256 is the lowercase service digest verified against the downloaded bytes.
+	SHA256 string
+	// RequestID correlates the URL-issuance control-plane request.
+	RequestID string
+}
+
 type registryControlPlane interface {
 	CreateRegistry(context.Context, CreateRegistryOptions) (RegistryInfo, error)
 	GetRegistry(context.Context, string) (RegistryInfo, error)
@@ -521,6 +567,8 @@ type registryControlPlane interface {
 	PreviewRegistryRecord(context.Context, string, string, *RegistryVersionSelector) (RegistryPreviewInfo, error)
 	SyncRegistryRecord(context.Context, string, string, *RegistryVersionSelector, string) (RegistrySyncResult, error)
 	ListRegistryAuditLogs(context.Context, string, RegistryAuditLogListOptions) (RegistryAuditLogPage, error)
+	UploadRegistrySkillPackage(context.Context, string, string, string, io.Reader, int64, int64) (RegistrySkillPackageUploadResult, error)
+	DownloadRegistrySkillPackage(context.Context, string, string, *RegistryVersionSelector, io.Writer, int64) (RegistrySkillPackageDownloadResult, error)
 }
 
 // RegistryManager manages Preview Registry resources.
@@ -799,6 +847,52 @@ func (m *RegistryRecordManager) Sync(ctx context.Context, recordID string, selec
 	return cp.SyncRegistryRecord(ctx, m.registryID, recordID, selector, changeLog)
 }
 
+// UploadSkillPackage streams one gzip tar archive to an existing TAR_PACKAGE Version. The SDK
+// obtains and consumes the short-lived upload URL internally and never returns it. The upload is
+// not retried. Success means the bytes were accepted by object storage; call Get to observe the
+// service's asynchronous ContentStatus transition to READY.
+func (m *RegistryRecordManager) UploadSkillPackage(ctx context.Context, recordID, versionID string, body io.Reader, opts RegistrySkillPackageUploadOptions) (RegistrySkillPackageUploadResult, error) {
+	op := "Registries.Records.UploadSkillPackage"
+	if strings.TrimSpace(recordID) == "" || strings.TrimSpace(versionID) == "" || body == nil || opts.SizeBytes <= 0 {
+		return RegistrySkillPackageUploadResult{}, codeError(InvalidArgument, op, "SKILL_PACKAGE_UPLOAD_INVALID")
+	}
+	max, err := registrySkillPackageMax(opts.MaxBytes, op)
+	if err != nil {
+		return RegistrySkillPackageUploadResult{}, err
+	}
+	if opts.SizeBytes > max {
+		return RegistrySkillPackageUploadResult{}, &Error{Code: ResourceExhausted, Operation: op, Reason: "SKILL_PACKAGE_TOO_LARGE", Retryable: false}
+	}
+	cp, err := m.transport(op)
+	if err != nil {
+		return RegistrySkillPackageUploadResult{}, err
+	}
+	return cp.UploadRegistrySkillPackage(ctx, m.registryID, recordID, versionID, body, opts.SizeBytes, max)
+}
+
+// DownloadSkillPackage streams and verifies one READY TAR_PACKAGE Version. Nil selector uses the
+// Stable service default. A failed call may have written a prefix to dst; use a temporary file when
+// atomic replacement is required. The SDK does not extract the archive.
+func (m *RegistryRecordManager) DownloadSkillPackage(ctx context.Context, recordID string, selector *RegistryVersionSelector, dst io.Writer, opts RegistrySkillPackageDownloadOptions) (RegistrySkillPackageDownloadResult, error) {
+	op := "Registries.Records.DownloadSkillPackage"
+	selector = copyRegistrySelector(selector)
+	if strings.TrimSpace(recordID) == "" || dst == nil {
+		return RegistrySkillPackageDownloadResult{}, codeError(InvalidArgument, op, "SKILL_PACKAGE_DOWNLOAD_INVALID")
+	}
+	if err := validateRegistrySelector(selector, op, true); err != nil {
+		return RegistrySkillPackageDownloadResult{}, err
+	}
+	max, err := registrySkillPackageMax(opts.MaxBytes, op)
+	if err != nil {
+		return RegistrySkillPackageDownloadResult{}, err
+	}
+	cp, err := m.transport(op)
+	if err != nil {
+		return RegistrySkillPackageDownloadResult{}, err
+	}
+	return cp.DownloadRegistrySkillPackage(ctx, m.registryID, recordID, selector, dst, max)
+}
+
 // ListAuditLogs returns one Registry audit page.
 func (m *RegistryRecordManager) ListAuditLogs(ctx context.Context, opts RegistryAuditLogListOptions) (RegistryAuditLogPage, error) {
 	op := "Registries.Records.ListAuditLogs"
@@ -933,10 +1027,16 @@ func validateRegistrySource(kind RegistryDescriptorType, mcp *RegistryMCPSource,
 		if skill == nil {
 			return codeError(InvalidArgument, op, "SOURCE_UNION_INVALID")
 		}
-		if skill.Type == RegistrySourceTarPackage {
-			return codeError(Unsupported, op, "SKILL_PACKAGE_TRANSFER_UNAVAILABLE")
-		}
-		if skill.Type != RegistrySourceManual || strings.TrimSpace(skill.SkillMD) == "" || len(skill.SkillMD) > maxRegistryJSONBytes {
+		switch skill.Type {
+		case RegistrySourceManual:
+			if strings.TrimSpace(skill.SkillMD) == "" || len(skill.SkillMD) > maxRegistryJSONBytes {
+				return codeError(InvalidArgument, op, "SKILL_SOURCE_INVALID")
+			}
+		case RegistrySourceTarPackage:
+			if skill.SkillMD != "" {
+				return codeError(InvalidArgument, op, "SKILL_SOURCE_INVALID")
+			}
+		default:
 			return codeError(InvalidArgument, op, "SKILL_SOURCE_INVALID")
 		}
 		return nil
@@ -948,6 +1048,16 @@ func validateRegistrySource(kind RegistryDescriptorType, mcp *RegistryMCPSource,
 	default:
 		return codeError(InvalidArgument, op, "DESCRIPTOR_TYPE_INVALID")
 	}
+}
+
+func registrySkillPackageMax(value int64, op string) (int64, error) {
+	if value < 0 {
+		return 0, codeError(InvalidArgument, op, "MAX_BYTES_INVALID")
+	}
+	if value == 0 {
+		return DefaultMaxRegistrySkillPackageBytes, nil
+	}
+	return value, nil
 }
 
 func validateStructuredRegistrySource(kind RegistrySourceType, descriptors json.RawMessage, endpoint, op string) error {

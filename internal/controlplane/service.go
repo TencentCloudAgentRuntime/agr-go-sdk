@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/dataplane"
+	registrytransfer "github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/dataplane/registry"
 	"github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/model"
 	internalruntime "github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/runtime"
 )
@@ -17,10 +18,11 @@ import (
 // acquisition of immutable runtime generations. Public API types are mapped by
 // the root facade and never cross this boundary.
 type Service struct {
-	timeout time.Duration
-	ags     *AGS
-	monitor *Monitor
-	runtime *dataplane.CloudConnector
+	timeout          time.Duration
+	ags              *AGS
+	monitor          *Monitor
+	runtime          *dataplane.CloudConnector
+	registryTransfer *registrytransfer.Client
 }
 
 type ServiceConfig struct {
@@ -39,7 +41,7 @@ func NewService(config ServiceConfig) *Service {
 	if source == nil {
 		source = agsAPI
 	}
-	return &Service{timeout: config.Timeout, ags: agsAPI, monitor: monitorAPI, runtime: dataplane.NewCloudConnector(config.Region, source, client)}
+	return &Service{timeout: config.Timeout, ags: agsAPI, monitor: monitorAPI, runtime: dataplane.NewCloudConnector(config.Region, source, client), registryTransfer: registrytransfer.New(client)}
 }
 
 func cloneHTTPClient(client *http.Client) *http.Client {

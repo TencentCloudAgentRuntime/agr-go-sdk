@@ -3,9 +3,16 @@ package controlplane
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"time"
+
+	registrytransfer "github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/dataplane/registry"
+	"github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/model"
 )
 
 const maxRegistryJSONBytes = 1 << 20
@@ -156,6 +163,30 @@ type RegistrySyncResult struct {
 	RequestID                 string
 }
 
+type RegistrySkillPackageUpload struct {
+	Version               RegistryRecordVersion
+	ContentStatus, SHA256 string
+	SizeBytes             int64
+	RequestID             string
+}
+
+type RegistrySkillPackageDownload struct {
+	ResolvedVersionID, SHA256 string
+	SizeBytes                 int64
+	RequestID                 string
+}
+
+type registrySkillPackageUploadTicket struct {
+	Version       RegistryRecordVersion
+	URL           string
+	ContentStatus string
+	RequestID     string
+}
+
+type registrySkillPackageDownloadTicket struct {
+	URL, SHA256, ResolvedVersionID, RequestID string
+}
+
 func (s *Service) CreateRegistry(ctx context.Context, request CreateRegistryRequest) (RegistryResult, error) {
 	out, err := s.ags.CreateRegistry(ctx, request)
 	return out, cloudError(err, "CreateRegistry")
@@ -213,6 +244,70 @@ func (s *Service) SyncRegistryRecord(ctx context.Context, registryID, recordID s
 func (s *Service) ListRegistryAuditLogs(ctx context.Context, registryID string, request RegistryAuditLogRequest) (RegistryAuditLogPage, error) {
 	out, err := s.ags.ListRegistryAuditLogs(ctx, registryID, request)
 	return out, cloudError(err, "DescribeRegistryAuditLogList")
+}
+
+func (s *Service) UploadRegistrySkillPackage(ctx context.Context, registryID, recordID, versionID string, body io.Reader, size, max int64) (RegistrySkillPackageUpload, error) {
+	ticket, err := s.ags.GetRegistrySkillPackageUploadURL(ctx, registryID, recordID, versionID)
+	if err != nil {
+		return RegistrySkillPackageUpload{}, cloudError(err, "GetSkillPackageUploadURL")
+	}
+	if ticket.Version.ID != versionID || ticket.Version.RecordID != recordID {
+		return RegistrySkillPackageUpload{}, failure(model.Protocol, "GetSkillPackageUploadURL", "SKILL_PACKAGE_IDENTITY_MISMATCH", false, nil)
+	}
+	transferred, err := s.registryTransfer.Upload(ctx, ticket.URL, body, size, max)
+	if err != nil {
+		return RegistrySkillPackageUpload{}, registryPackageTransferError(ctx, "UploadSkillPackage", err)
+	}
+	return RegistrySkillPackageUpload{Version: ticket.Version, ContentStatus: ticket.ContentStatus, SHA256: transferred.SHA256, SizeBytes: transferred.Bytes, RequestID: ticket.RequestID}, nil
+}
+
+func (s *Service) DownloadRegistrySkillPackage(ctx context.Context, registryID, recordID string, selector *RegistrySelector, dst io.Writer, max int64) (RegistrySkillPackageDownload, error) {
+	ticket, err := s.ags.GetRegistrySkillPackageDownloadURL(ctx, registryID, recordID, selector)
+	if err != nil {
+		return RegistrySkillPackageDownload{}, cloudError(err, "GetSkillPackageDownloadURL")
+	}
+	transferred, err := s.registryTransfer.Download(ctx, ticket.URL, ticket.SHA256, dst, max)
+	if err != nil {
+		return RegistrySkillPackageDownload{}, registryPackageTransferError(ctx, "DownloadSkillPackage", err)
+	}
+	return RegistrySkillPackageDownload{ResolvedVersionID: ticket.ResolvedVersionID, SHA256: transferred.SHA256, SizeBytes: transferred.Bytes, RequestID: ticket.RequestID}, nil
+}
+
+func registryPackageTransferError(ctx context.Context, operation string, err error) error {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return failure(model.Canceled, operation, "REQUEST_CANCELED", false, nil)
+	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return failure(model.DeadlineExceeded, operation, "DEADLINE_EXCEEDED", false, nil)
+	}
+	var transfer *registrytransfer.Error
+	if !errors.As(err, &transfer) {
+		return failure(model.Internal, operation, "SKILL_PACKAGE_TRANSFER_FAILED", false, nil)
+	}
+	switch transfer.Kind {
+	case registrytransfer.InvalidURL:
+		return failure(model.Protocol, operation, "SKILL_PACKAGE_URL_INVALID", false, nil)
+	case registrytransfer.InvalidSize:
+		return failure(model.Protocol, operation, "SKILL_PACKAGE_SIZE_MISMATCH", false, nil)
+	case registrytransfer.SizeExceeded:
+		return failure(model.ResourceExhausted, operation, "SKILL_PACKAGE_TOO_LARGE", false, nil)
+	case registrytransfer.DigestMismatch:
+		return failure(model.Protocol, operation, "SKILL_PACKAGE_DIGEST_MISMATCH", false, nil)
+	case registrytransfer.HTTPStatus:
+		switch transfer.StatusCode {
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return failure(model.PermissionDenied, operation, "SKILL_PACKAGE_TRANSFER_DENIED", false, nil)
+		case http.StatusNotFound:
+			return failure(model.NotFound, operation, "SKILL_PACKAGE_NOT_FOUND", false, nil)
+		case http.StatusRequestEntityTooLarge:
+			return failure(model.ResourceExhausted, operation, "SKILL_PACKAGE_TOO_LARGE", false, nil)
+		case http.StatusTooManyRequests:
+			return failure(model.ResourceExhausted, operation, "SKILL_PACKAGE_RATE_LIMITED", true, nil)
+		}
+		return failure(model.Unavailable, operation, "SKILL_PACKAGE_TRANSFER_HTTP_ERROR", transfer.StatusCode >= 500, nil)
+	default:
+		return failure(model.Unavailable, operation, "SKILL_PACKAGE_TRANSFER_FAILED", false, nil)
+	}
 }
 
 type registryTagWire struct{ Key, Value string }
@@ -581,6 +676,73 @@ func (a *AGS) SyncRegistryRecord(ctx context.Context, registryID, recordID strin
 		out.Record = &value
 	}
 	return out, nil
+}
+
+func (a *AGS) GetRegistrySkillPackageUploadURL(ctx context.Context, registryID, recordID, versionID string) (registrySkillPackageUploadTicket, error) {
+	req := struct {
+		RegistryID string `json:"RegistryId"`
+		RecordID   string `json:"RecordId"`
+		VersionID  string `json:"VersionId"`
+	}{RegistryID: registryID, RecordID: recordID, VersionID: versionID}
+	var response struct {
+		Version       *registryVersionWire
+		UploadURL     string
+		ContentStatus string
+		ExpireTime    string
+		RequestID     string `json:"RequestId"`
+	}
+	if err := a.commonCall(ctx, "GetSkillPackageUploadURL", req, &response); err != nil {
+		return registrySkillPackageUploadTicket{}, err
+	}
+	if response.ExpireTime != "" {
+		if _, err := time.Parse(time.RFC3339Nano, response.ExpireTime); err != nil {
+			return registrySkillPackageUploadTicket{}, malformedRegistryResponse("GetSkillPackageUploadURL ExpireTime is invalid")
+		}
+	}
+	version, err := registryVersionFromWire(response.Version)
+	if err != nil || response.UploadURL == "" || response.RequestID == "" {
+		if err == nil {
+			err = malformedRegistryResponse("GetSkillPackageUploadURL response is malformed")
+		}
+		return registrySkillPackageUploadTicket{}, err
+	}
+	status := response.ContentStatus
+	if status == "" {
+		status = version.ContentStatus
+	}
+	return registrySkillPackageUploadTicket{Version: version, URL: response.UploadURL, ContentStatus: status, RequestID: response.RequestID}, nil
+}
+
+func (a *AGS) GetRegistrySkillPackageDownloadURL(ctx context.Context, registryID, recordID string, selector *RegistrySelector) (registrySkillPackageDownloadTicket, error) {
+	req := registrySelectorRequest(registryID, recordID, selector)
+	var response struct {
+		DownloadURL       string
+		ExpireTime        string
+		SHA256            string
+		ResolvedVersionID string `json:"ResolvedVersionId"`
+		RequestID         string `json:"RequestId"`
+	}
+	if err := a.commonCall(ctx, "GetSkillPackageDownloadURL", req, &response); err != nil {
+		return registrySkillPackageDownloadTicket{}, err
+	}
+	if response.DownloadURL == "" || response.ExpireTime == "" || !validRegistrySHA256(response.SHA256) || response.ResolvedVersionID == "" || response.RequestID == "" {
+		return registrySkillPackageDownloadTicket{}, malformedRegistryResponse("GetSkillPackageDownloadURL response is malformed")
+	}
+	if _, err := time.Parse(time.RFC3339Nano, response.ExpireTime); err != nil {
+		return registrySkillPackageDownloadTicket{}, malformedRegistryResponse("GetSkillPackageDownloadURL ExpireTime is invalid")
+	}
+	if selector != nil && selector.VersionID != "" && selector.VersionID != response.ResolvedVersionID {
+		return registrySkillPackageDownloadTicket{}, malformedRegistryResponse("GetSkillPackageDownloadURL resolved a different Version")
+	}
+	return registrySkillPackageDownloadTicket{URL: response.DownloadURL, SHA256: response.SHA256, ResolvedVersionID: response.ResolvedVersionID, RequestID: response.RequestID}, nil
+}
+
+func validRegistrySHA256(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == sha256.Size && value == hex.EncodeToString(decoded)
 }
 
 func (a *AGS) ListRegistryAuditLogs(ctx context.Context, registryID string, in RegistryAuditLogRequest) (RegistryAuditLogPage, error) {
