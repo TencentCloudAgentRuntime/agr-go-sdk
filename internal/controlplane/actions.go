@@ -53,6 +53,8 @@ var actionRoutes = map[string]ActionRoute{
 	"DescribeSessions":                  CommonClient,
 	"DescribeVolumeList":                CommonClient,
 	"DescribeVolumeTemplateList":        CommonClient,
+	"GetSkillPackageDownloadURL":        CommonClient,
+	"GetSkillPackageUploadURL":          CommonClient,
 	"PauseSandboxInstance":              OfficialTyped,
 	"PreviewRegistryRecord":             CommonClient,
 	"RejectRegistryRecord":              CommonClient,

@@ -8,9 +8,9 @@
   "source_schema_sha256": "d09e09e9a53ef59521c36f7c3cd5eeb78ce4aef64b0832ba4862abe82a183744",
   "source_patch_sha256": "56544a0b5b4a14c59a1caedfc74d9486358fd42e6868d95f15e2a33b4ed09ef0",
   "source_effective_sha256": "32519794cc2df4c7515f1fd223515735135480dedb4408cd8fe9669e911bab88",
-  "sdk_effective_sha256": "a39ea8ecad7b36875b7b2085946b6834ab716c70274153fb82cbbd54521b542a",
-  "sdk_effective_actions": 56,
-  "sdk_effective_objects": 174,
+  "sdk_effective_sha256": "a47a1b47a02a0759a5e5d83de7fb9a37eac6d83002e490219a665bea7b5113d8",
+  "sdk_effective_actions": 58,
+  "sdk_effective_objects": 178,
   "field_maturity_default": "stable",
   "preview_fields": [
     {
@@ -657,6 +657,32 @@
         "StorageSpec",
         "Tag",
         "VolumeTemplate"
+      ]
+    },
+    {
+      "name": "GetSkillPackageDownloadURL",
+      "resource": "registry_skill_package",
+      "maturity": "preview",
+      "route": "common_client",
+      "request": "GetSkillPackageDownloadURLRequest",
+      "response": "GetSkillPackageDownloadURLResponse",
+      "objects": [
+        "GetSkillPackageDownloadURLRequest",
+        "GetSkillPackageDownloadURLResponse"
+      ]
+    },
+    {
+      "name": "GetSkillPackageUploadURL",
+      "resource": "registry_skill_package",
+      "maturity": "preview",
+      "route": "common_client",
+      "request": "GetSkillPackageUploadURLRequest",
+      "response": "GetSkillPackageUploadURLResponse",
+      "objects": [
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction",
+        "GetSkillPackageUploadURLRequest",
+        "GetSkillPackageUploadURLResponse"
       ]
     },
     {

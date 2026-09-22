@@ -280,6 +280,20 @@
       "output": "DescribeVolumeTemplateListResponse",
       "status": "online"
     },
+    "GetSkillPackageDownloadURL": {
+      "document": "获取 Skill 包下载 URL。VersionId 与 Label 互斥；均省略时使用 Stable。响应包含 ResolvedVersionId，便于调用方回填。",
+      "input": "GetSkillPackageDownloadURLRequest",
+      "name": "Get a skill package download URL",
+      "output": "GetSkillPackageDownloadURLResponse",
+      "status": "online"
+    },
+    "GetSkillPackageUploadURL": {
+      "document": "为 FAILED / EXPIRED 的 TAR Skill Version 生成新的上传尝试；VersionId 与 Revision 保持不变。",
+      "input": "GetSkillPackageUploadURLRequest",
+      "name": "Get a skill package upload URL",
+      "output": "GetSkillPackageUploadURLResponse",
+      "status": "online"
+    },
     "ModifyDeployment": {
       "document": "修改 Deployment",
       "input": "ModifyDeploymentRequest",
@@ -4877,6 +4891,151 @@
         }
       ],
       "usage": "both"
+    },
+    "GetSkillPackageDownloadURLRequest": {
+      "document": "GetSkillPackageDownloadURL request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID；必须 AGENT_SKILLS 且 ContentStatus=READY。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "可选。指定要下载的 Version；与 Label 互斥；均省略时使用 Stable。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "可选。指定要下载的 Label 目标；与 VersionId 互斥；均省略时使用 Stable。",
+          "member": "string",
+          "name": "Label",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "GetSkillPackageDownloadURLResponse": {
+      "document": "GetSkillPackageDownloadURL response",
+      "members": [
+        {
+          "document": "COS GET 预签名 URL；带 response-content-disposition；默认 TTL 5 分钟；bearer 凭证禁止持久化。",
+          "member": "string",
+          "name": "DownloadURL",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "URL 过期时间。",
+          "member": "string",
+          "name": "ExpireTime",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "服务端记录的 SHA-256；下载后应本地自检。",
+          "member": "string",
+          "name": "SHA256",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "解析出的 Version ID（Stable Version）。",
+          "member": "string",
+          "name": "ResolvedVersionId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "GetSkillPackageUploadURLRequest": {
+      "document": "GetSkillPackageUploadURL request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Version ID；格式 `rv-` + 8 位小写字母/数字。",
+          "member": "string",
+          "name": "VersionId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "GetSkillPackageUploadURLResponse": {
+      "document": "GetSkillPackageUploadURL response",
+      "members": [
+        {
+          "document": "Version 详情（Revision 不变）。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "新的 COS PUT 预签名 URL。",
+          "member": "string",
+          "name": "UploadURL",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "重试后的内容状态。",
+          "member": "string",
+          "name": "ContentStatus",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "UploadURL 过期时间。",
+          "member": "string",
+          "name": "ExpireTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
     },
     "HttpGetAction": {
       "document": "HTTP GET 探测动作配置",
