@@ -106,10 +106,10 @@ Unselected fields introduced by the CLI patch are removed from the SDK preview s
 field to `preview_fields` only with its public SDK mapping, tests, and real-service evidence.
 
 Review every Action addition to `contracts/control-plane.json`; synchronization must
-never add newly discovered CLI Actions automatically. Prefer `official_typed`. Use `common_raw`
+never add newly discovered CLI Actions automatically. Prefer `official_typed`. Use `common_client`
 only when the effective public API contains the Action but the official Go SDK does not, and list
-it in `raw_actions`. A typed network or service error must never fall back to raw because that can
-submit a mutation twice. Do not edit the generated effective snapshot or its hashes by hand.
+it in `common_actions`. A typed network or service error must never switch to CommonClient because
+that can submit a mutation twice. Do not edit the generated effective snapshot or its hashes by hand.
 
 ## Preview releases
 

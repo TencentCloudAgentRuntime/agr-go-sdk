@@ -12,11 +12,11 @@ import (
 
 const agsAPIVersion = "2025-09-20"
 
-// commonCall invokes only Actions whose reviewed route is CommonRaw. It is not
+// commonCall invokes only Actions whose reviewed route is CommonClient. It is not
 // a fallback for typed requests and is deliberately unavailable outside this
 // package.
 func (a *AGS) commonCall(ctx context.Context, action string, input, output any) error {
-	if actionRoutes[action] != CommonRaw {
+	if actionRoutes[action] != CommonClient {
 		return &Error{Code: "ClientError.ActionNotAllowed", Cause: errors.New("action is not approved for CommonClient routing")}
 	}
 	return a.sendCommon(ctx, action, input, output)

@@ -53,7 +53,7 @@
       "name": "AppendEvent",
       "resource": "session_event",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "AppendEventRequest",
       "response": "AppendEventResponse",
       "objects": [
@@ -71,7 +71,7 @@
       "name": "ApproveRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "ApproveRegistryRecordRequest",
       "response": "ApproveRegistryRecordResponse",
       "objects": [
@@ -85,7 +85,7 @@
       "name": "CancelRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CancelRegistryRecordRequest",
       "response": "CancelRegistryRecordResponse",
       "objects": [
@@ -128,7 +128,7 @@
       "name": "CreateRegistry",
       "resource": "registry",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CreateRegistryRequest",
       "response": "CreateRegistryResponse",
       "objects": [
@@ -142,7 +142,7 @@
       "name": "CreateRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CreateRegistryRecordRequest",
       "response": "CreateRegistryRecordResponse",
       "objects": [
@@ -196,7 +196,7 @@
       "name": "CreateSession",
       "resource": "session",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CreateSessionRequest",
       "response": "CreateSessionResponse",
       "objects": [
@@ -211,7 +211,7 @@
       "name": "CreateSessionSpace",
       "resource": "session_space",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CreateSessionSpaceRequest",
       "response": "CreateSessionSpaceResponse",
       "objects": [
@@ -225,7 +225,7 @@
       "name": "CreateVolume",
       "resource": "volume",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CreateVolumeRequest",
       "response": "CreateVolumeResponse",
       "objects": [
@@ -242,7 +242,7 @@
       "name": "CreateVolumeTemplate",
       "resource": "volume_template",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "CreateVolumeTemplateRequest",
       "response": "CreateVolumeTemplateResponse",
       "objects": [
@@ -271,7 +271,7 @@
       "name": "DeleteRegistry",
       "resource": "registry",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DeleteRegistryRequest",
       "response": "DeleteRegistryResponse",
       "objects": [
@@ -283,7 +283,7 @@
       "name": "DeleteRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DeleteRegistryRecordRequest",
       "response": "DeleteRegistryRecordResponse",
       "objects": [
@@ -307,7 +307,7 @@
       "name": "DeleteSession",
       "resource": "session",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DeleteSessionRequest",
       "response": "DeleteSessionResponse",
       "objects": [
@@ -319,7 +319,7 @@
       "name": "DeleteSessionSpace",
       "resource": "session_space",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DeleteSessionSpaceRequest",
       "response": "DeleteSessionSpaceResponse",
       "objects": [
@@ -331,7 +331,7 @@
       "name": "DeleteVolume",
       "resource": "volume",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DeleteVolumeRequest",
       "response": "DeleteVolumeResponse",
       "objects": [
@@ -343,7 +343,7 @@
       "name": "DeleteVolumeTemplate",
       "resource": "volume_template",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DeleteVolumeTemplateRequest",
       "response": "DeleteVolumeTemplateResponse",
       "objects": [
@@ -390,7 +390,7 @@
       "name": "DescribeEvents",
       "resource": "session_event",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeEventsRequest",
       "response": "DescribeEventsResponse",
       "objects": [
@@ -419,7 +419,7 @@
       "name": "DescribeRegistry",
       "resource": "registry",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeRegistryRequest",
       "response": "DescribeRegistryResponse",
       "objects": [
@@ -433,7 +433,7 @@
       "name": "DescribeRegistryAuditLogList",
       "resource": "registry_audit_log",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeRegistryAuditLogListRequest",
       "response": "DescribeRegistryAuditLogListResponse",
       "objects": [
@@ -446,7 +446,7 @@
       "name": "DescribeRegistryList",
       "resource": "registry",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeRegistryListRequest",
       "response": "DescribeRegistryListResponse",
       "objects": [
@@ -461,7 +461,7 @@
       "name": "DescribeRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeRegistryRecordRequest",
       "response": "DescribeRegistryRecordResponse",
       "objects": [
@@ -476,7 +476,7 @@
       "name": "DescribeRegistryRecordList",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeRegistryRecordListRequest",
       "response": "DescribeRegistryRecordListResponse",
       "objects": [
@@ -490,7 +490,7 @@
       "name": "DescribeRegistryRecordVersionList",
       "resource": "registry_record_version",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeRegistryRecordVersionListRequest",
       "response": "DescribeRegistryRecordVersionListResponse",
       "objects": [
@@ -569,7 +569,7 @@
       "name": "DescribeSession",
       "resource": "session",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeSessionRequest",
       "response": "DescribeSessionResponse",
       "objects": [
@@ -584,7 +584,7 @@
       "name": "DescribeSessionSpace",
       "resource": "session_space",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeSessionSpaceRequest",
       "response": "DescribeSessionSpaceResponse",
       "objects": [
@@ -597,7 +597,7 @@
       "name": "DescribeSessionSpaces",
       "resource": "session_space",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeSessionSpacesRequest",
       "response": "DescribeSessionSpacesResponse",
       "objects": [
@@ -611,7 +611,7 @@
       "name": "DescribeSessions",
       "resource": "session",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeSessionsRequest",
       "response": "DescribeSessionsResponse",
       "objects": [
@@ -627,7 +627,7 @@
       "name": "DescribeVolumeList",
       "resource": "volume",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeVolumeListRequest",
       "response": "DescribeVolumeListResponse",
       "objects": [
@@ -645,7 +645,7 @@
       "name": "DescribeVolumeTemplateList",
       "resource": "volume_template",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "DescribeVolumeTemplateListRequest",
       "response": "DescribeVolumeTemplateListResponse",
       "objects": [
@@ -680,7 +680,7 @@
       "name": "ModifySession",
       "resource": "session",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "ModifySessionRequest",
       "response": "ModifySessionResponse",
       "objects": [
@@ -695,7 +695,7 @@
       "name": "ModifySessionSpace",
       "resource": "session_space",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "ModifySessionSpaceRequest",
       "response": "ModifySessionSpaceResponse",
       "objects": [
@@ -720,7 +720,7 @@
       "name": "PreviewRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "PreviewRegistryRecordRequest",
       "response": "PreviewRegistryRecordResponse",
       "objects": [
@@ -732,7 +732,7 @@
       "name": "RejectRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "RejectRegistryRecordRequest",
       "response": "RejectRegistryRecordResponse",
       "objects": [
@@ -796,7 +796,7 @@
       "name": "SyncRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "SyncRegistryRecordRequest",
       "response": "SyncRegistryRecordResponse",
       "objects": [
@@ -811,7 +811,7 @@
       "name": "UpdateRegistry",
       "resource": "registry",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "UpdateRegistryRequest",
       "response": "UpdateRegistryResponse",
       "objects": [
@@ -825,7 +825,7 @@
       "name": "UpdateRegistryRecord",
       "resource": "registry_record",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "UpdateRegistryRecordRequest",
       "response": "UpdateRegistryRecordResponse",
       "objects": [
@@ -882,7 +882,7 @@
       "name": "UpdateVolume",
       "resource": "volume",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "UpdateVolumeRequest",
       "response": "UpdateVolumeResponse",
       "objects": [
@@ -895,7 +895,7 @@
       "name": "UpdateVolumeTemplate",
       "resource": "volume_template",
       "maturity": "preview",
-      "route": "common_raw",
+      "route": "common_client",
       "request": "UpdateVolumeTemplateRequest",
       "response": "UpdateVolumeTemplateResponse",
       "objects": [

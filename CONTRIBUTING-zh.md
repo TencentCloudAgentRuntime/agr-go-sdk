@@ -97,8 +97,8 @@ CLI patch 新增但未被选择的字段不会进入 SDK preview snapshot。只�
 
 `contracts/control-plane.json` 每增加一个 Action 都必须人工评审；同步命令不得
 把 CLI 新发现的 Action 自动加入 SDK。优先使用 `official_typed`。只有 effective API 已包含、
-官方 Go SDK 尚未生成的 Action 才能选择 `common_raw`，并同时列入 `raw_actions`。typed 请求
-发生网络或服务错误后不得 fallback raw，否则 mutation 可能重复提交。不要手工修改生成的
+只有官方 Go SDK 尚未生成的 Action 才能选择 `common_client`，并同时列入 `common_actions`。typed 请求
+发生网络或服务错误后不得切换到 CommonClient，否则 mutation 可能重复提交。不要手工修改生成的
 effective snapshot 或 hash。
 
 ## Preview 发布

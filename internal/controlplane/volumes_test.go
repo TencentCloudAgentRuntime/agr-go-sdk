@@ -18,7 +18,7 @@ func TestCommonActionAllowlistRejectsUnreviewedActionWithoutNetwork(t *testing.T
 		return nil, errors.New("network")
 	})}, func(context.Context) (Credential, error) { return Credential{SecretID: "id", SecretKey: "key"}, nil })
 	if err := api.commonCall(context.Background(), "CreateSandboxTool", map[string]any{}, &struct{}{}); err == nil {
-		t.Fatal("unreviewed CommonRaw Action accepted")
+		t.Fatal("unreviewed CommonClient Action accepted")
 	}
 	if calls.Load() != 0 {
 		t.Fatalf("unreviewed Action made %d calls", calls.Load())

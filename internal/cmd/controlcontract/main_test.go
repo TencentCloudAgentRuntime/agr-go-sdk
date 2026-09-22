@@ -87,12 +87,12 @@ func TestReadRoutingRejectsRawRouteMismatch(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte(`{"service":"ags","version":"20250920","channels":["stable","preview"],"actions":[{"name":"Action","resource":"fixture","maturity":"stable","route":"common_raw"}],"preview_fields":[],"raw_actions":[]}`)
+	data := []byte(`{"service":"ags","version":"20250920","channels":["stable","preview"],"actions":[{"name":"Action","resource":"fixture","maturity":"stable","route":"common_client"}],"preview_fields":[],"common_actions":[]}`)
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err := readRouting(root)
-	if err == nil || !strings.Contains(err.Error(), "route and raw_actions disagree") {
+	if err == nil || !strings.Contains(err.Error(), "route and common_actions disagree") {
 		t.Fatalf("error = %v, want raw route mismatch", err)
 	}
 }
@@ -103,7 +103,7 @@ func TestRoutingForChannelExcludesPreviewFromStable(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte(`{"service":"ags","version":"20250920","channels":["stable","preview"],"actions":[{"name":"PreviewAction","resource":"fixture","maturity":"preview","route":"official_typed"},{"name":"StableAction","resource":"fixture","maturity":"stable","route":"official_typed"}],"preview_fields":[{"object":"StableRequest","field":"PreviewValue","maturity":"preview"}],"raw_actions":[]}`)
+	data := []byte(`{"service":"ags","version":"20250920","channels":["stable","preview"],"actions":[{"name":"PreviewAction","resource":"fixture","maturity":"preview","route":"official_typed"},{"name":"StableAction","resource":"fixture","maturity":"stable","route":"official_typed"}],"preview_fields":[{"object":"StableRequest","field":"PreviewValue","maturity":"preview"}],"common_actions":[]}`)
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}

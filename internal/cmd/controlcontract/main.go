@@ -52,7 +52,7 @@ type routingContract struct {
 	Channels      []string        `json:"channels"`
 	Actions       []actionRoute   `json:"actions"`
 	PreviewFields []fieldMaturity `json:"preview_fields"`
-	RawActions    []string        `json:"raw_actions"`
+	CommonActions []string        `json:"common_actions"`
 }
 
 type manifestAction struct {
@@ -310,8 +310,8 @@ func verifyChannel(root, channel string, routing routingContract, stdout io.Writ
 	if !reflect.DeepEqual(recorded.Actions, wantActions) || !reflect.DeepEqual(recorded.PreviewFields, selected.PreviewFields) {
 		return apiContract{}, fmt.Errorf("%s manifest action or field maturity metadata is stale", channel)
 	}
-	typed, raw := routeCounts(selected)
-	fmt.Fprintf(stdout, "%s control contract verified: %d actions, %d objects, %d typed, %d raw\n", channel, len(api.Actions), len(closure), typed, raw)
+	typed, common := routeCounts(selected)
+	fmt.Fprintf(stdout, "%s control contract verified: %d actions, %d objects, %d typed, %d common client\n", channel, len(api.Actions), len(closure), typed, common)
 	return api, nil
 }
 
@@ -527,15 +527,15 @@ func routingForChannel(routing routingContract, channel string) routingContract 
 	selected := routing
 	selected.Channels = []string{channel}
 	selected.Actions = nil
-	selected.RawActions = nil
+	selected.CommonActions = nil
 	selected.PreviewFields = []fieldMaturity{}
 	for _, action := range routing.Actions {
 		if channel == stableChannel && action.Maturity == previewChannel {
 			continue
 		}
 		selected.Actions = append(selected.Actions, action)
-		if action.Route == string(controlplane.CommonRaw) {
-			selected.RawActions = append(selected.RawActions, action.Name)
+		if action.Route == string(controlplane.CommonClient) {
+			selected.CommonActions = append(selected.CommonActions, action.Name)
 		}
 	}
 	if channel == previewChannel {
@@ -556,12 +556,12 @@ func readRouting(root string) (routingContract, error) {
 	if routing.Service == "" || routing.Version == "" || len(routing.Actions) == 0 || !reflect.DeepEqual(routing.Channels, []string{stableChannel, previewChannel}) {
 		return routingContract{}, errors.New("action routing metadata is incomplete")
 	}
-	seen, raw := map[string]bool{}, map[string]bool{}
-	for _, name := range routing.RawActions {
-		if raw[name] || name == "" {
-			return routingContract{}, fmt.Errorf("duplicate or empty raw action %q", name)
+	seen, common := map[string]bool{}, map[string]bool{}
+	for _, name := range routing.CommonActions {
+		if common[name] || name == "" {
+			return routingContract{}, fmt.Errorf("duplicate or empty common action %q", name)
 		}
-		raw[name] = true
+		common[name] = true
 	}
 	previous := ""
 	for _, action := range routing.Actions {
@@ -571,20 +571,20 @@ func readRouting(root string) (routingContract, error) {
 		if previous != "" && action.Name < previous {
 			return routingContract{}, errors.New("action routing must be sorted by action name")
 		}
-		if action.Route != string(controlplane.OfficialTyped) && action.Route != string(controlplane.CommonRaw) {
+		if action.Route != string(controlplane.OfficialTyped) && action.Route != string(controlplane.CommonClient) {
 			return routingContract{}, fmt.Errorf("action %s has unsupported route %q", action.Name, action.Route)
 		}
 		if action.Maturity != stableChannel && action.Maturity != previewChannel {
 			return routingContract{}, fmt.Errorf("action %s has unsupported maturity %q", action.Name, action.Maturity)
 		}
-		if raw[action.Name] != (action.Route == string(controlplane.CommonRaw)) {
-			return routingContract{}, fmt.Errorf("action %s route and raw_actions disagree", action.Name)
+		if common[action.Name] != (action.Route == string(controlplane.CommonClient)) {
+			return routingContract{}, fmt.Errorf("action %s route and common_actions disagree", action.Name)
 		}
 		seen[action.Name], previous = true, action.Name
 	}
-	for name := range raw {
+	for name := range common {
 		if !seen[name] {
-			return routingContract{}, fmt.Errorf("raw action %s is not in the action registry", name)
+			return routingContract{}, fmt.Errorf("common action %s is not in the action registry", name)
 		}
 	}
 	seenFields := map[string]bool{}
@@ -1000,15 +1000,15 @@ func compareImplementationRoutes(routing routingContract) error {
 	return nil
 }
 
-func routeCounts(routing routingContract) (typed, raw int) {
+func routeCounts(routing routingContract) (typed, common int) {
 	for _, action := range routing.Actions {
 		if action.Route == string(controlplane.OfficialTyped) {
 			typed++
 		} else {
-			raw++
+			common++
 		}
 	}
-	return typed, raw
+	return typed, common
 }
 
 func commandOutput(directory, name string, args ...string) ([]byte, error) {

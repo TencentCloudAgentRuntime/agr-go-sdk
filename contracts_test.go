@@ -56,8 +56,8 @@ func TestOfficialControlPlaneCallsStayInsideActionContract(t *testing.T) {
 		switch action.Route {
 		case string(controlplane.OfficialTyped):
 			want[action.Name] = true
-		case string(controlplane.CommonRaw):
-			// CommonRaw Actions have a separate exact source scan below.
+		case string(controlplane.CommonClient):
+			// CommonClient Actions have a separate exact source scan below.
 		default:
 			t.Fatalf("action %s has unknown route %s", action.Name, action.Route)
 		}
@@ -88,7 +88,7 @@ func TestCommonControlPlaneCallsStayInsideActionContract(t *testing.T) {
 	}](t, "contracts/control-plane.json")
 	want := map[string]bool{}
 	for _, action := range contract.Actions {
-		if action.Route == string(controlplane.CommonRaw) {
+		if action.Route == string(controlplane.CommonClient) {
 			want[action.Name] = true
 		}
 	}
