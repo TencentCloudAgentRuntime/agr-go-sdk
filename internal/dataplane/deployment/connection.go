@@ -15,7 +15,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const tokenRefreshBefore = 2 * time.Hour
+const (
+	tokenRefreshBefore       = 2 * time.Hour
+	maxWebSocketMessageBytes = 1024 * 1024
+)
 
 type Token struct {
 	Value     string
@@ -174,6 +177,7 @@ func (c *Connection) DialWebSocket(ctx context.Context, path string, headers htt
 	if err != nil {
 		return nil, response, err
 	}
+	conn.SetReadLimit(maxWebSocketMessageBytes)
 	responseID := ""
 	if c.affinity != nil && response != nil {
 		responseID = response.Header.Get(c.affinity.headerName)
@@ -213,9 +217,6 @@ func (c *Connection) Close() error {
 	c.mu.Unlock()
 	for _, socket := range sockets {
 		_ = socket.Close()
-	}
-	if closer, ok := c.http.Transport.(interface{ CloseIdleConnections() }); ok {
-		closer.CloseIdleConnections()
 	}
 	return nil
 }

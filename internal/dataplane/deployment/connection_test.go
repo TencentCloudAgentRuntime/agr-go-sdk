@@ -276,6 +276,64 @@ func TestConnectionCloseCancelsActiveSSEAndWebSocket(t *testing.T) {
 	}
 }
 
+func TestConnectionCloseDoesNotCloseCallerTransport(t *testing.T) {
+	transport := &closeTrackingTransport{}
+	connection, err := New(Config{
+		DeploymentID: "dpl-test",
+		Region:       "ap-test",
+		Domain:       "example.test",
+		Port:         8080,
+		TokenSource:  validTokenSource,
+		HTTPClient:   &http.Client{Transport: transport},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = connection.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if transport.closed.Load() != 0 {
+		t.Fatal("connection close took ownership of caller transport")
+	}
+}
+
+func TestWebSocketReadLimitRejectsOversizedMessage(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.WriteMessage(websocket.BinaryMessage, make([]byte, maxWebSocketMessageBytes+1))
+	}))
+	defer upstream.Close()
+	connection := newTestConnection(t, upstream, Config{
+		DeploymentID: "dpl-test", Region: "ap-test", Domain: "example.test", Port: 8080,
+		TokenSource: validTokenSource,
+	})
+	defer connection.Close()
+	socket, response, err := connection.DialWebSocket(context.Background(), "/ws", nil)
+	if err != nil {
+		if response != nil {
+			_ = response.Body.Close()
+		}
+		t.Fatal(err)
+	}
+	defer socket.Close()
+	if _, err = socket.Read(context.Background()); err == nil {
+		t.Fatal("oversized WebSocket message was accepted")
+	}
+}
+
+type closeTrackingTransport struct{ closed atomic.Int32 }
+
+func (*closeTrackingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("unexpected request")
+}
+
+func (t *closeTrackingTransport) CloseIdleConnections() { t.closed.Add(1) }
+
 func TestAffinityIgnoresStaleConcurrentRotation(t *testing.T) {
 	state := newAffinityState("X-Affinity", "one")
 	first, _ := state.acquire(context.Background())
