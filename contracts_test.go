@@ -92,14 +92,16 @@ func TestCommonControlPlaneCallsStayInsideActionContract(t *testing.T) {
 			want[action.Name] = true
 		}
 	}
-	data, err := os.ReadFile("internal/controlplane/volumes.go")
-	if err != nil {
-		t.Fatal(err)
-	}
 	used := map[string]bool{}
 	pattern := regexp.MustCompile(`commonCall\(ctx,\s*"([A-Z][A-Za-z0-9]+)"`)
-	for _, match := range pattern.FindAllSubmatch(data, -1) {
-		used[string(match[1])] = true
+	for _, path := range []string{"internal/controlplane/volumes.go", "internal/controlplane/sessions.go"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, match := range pattern.FindAllSubmatch(data, -1) {
+			used[string(match[1])] = true
+		}
 	}
 	if !reflect.DeepEqual(used, want) {
 		t.Fatalf("CommonClient control-plane calls drift: got=%v want=%v", used, want)

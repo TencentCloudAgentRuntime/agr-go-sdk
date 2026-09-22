@@ -2,6 +2,7 @@ package agr
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -331,6 +332,198 @@ func (c *controlAdapter) UpdateVolumeTemplate(ctx context.Context, id string, op
 
 func (c *controlAdapter) DeleteVolumeTemplate(ctx context.Context, id string) error {
 	return withResourceError(normalizeError("VolumeTemplates.Delete", c.service.DeleteVolumeTemplate(ctx, id)), "volume_template", id)
+}
+
+func (c *controlAdapter) CreateSessionSpace(ctx context.Context, opts CreateSessionSpaceOptions) (SessionSpaceInfo, error) {
+	tags := make([]controlplane.VolumeTag, len(opts.Tags))
+	for i, tag := range opts.Tags {
+		tags[i] = controlplane.VolumeTag{Key: tag.Key, Value: tag.Value}
+	}
+	out, err := c.service.CreateSessionSpace(ctx, controlplane.CreateSessionSpaceRequest{Name: opts.Name, Description: opts.Description, Tags: tags})
+	if err != nil {
+		return SessionSpaceInfo{}, normalizeError("SessionSpaces.Create", err)
+	}
+	return sessionSpaceInfoFrom(out), nil
+}
+
+func (c *controlAdapter) GetSessionSpace(ctx context.Context, id string) (SessionSpaceInfo, error) {
+	out, err := c.service.GetSessionSpace(ctx, id)
+	if err != nil {
+		return SessionSpaceInfo{}, withResourceError(normalizeError("SessionSpaces.Get", err), "session_space", id)
+	}
+	return sessionSpaceInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListSessionSpaces(ctx context.Context, opts SessionSpaceListOptions) (SessionSpacePage, error) {
+	in := controlplane.SessionSpaceListRequest{Offset: opts.Offset, Limit: opts.Limit, Filters: controlSessionFilters(opts.Filters)}
+	out, err := c.service.ListSessionSpaces(ctx, in)
+	if err != nil {
+		return SessionSpacePage{}, normalizeError("SessionSpaces.List", err)
+	}
+	page := SessionSpacePage{Items: make([]SessionSpaceInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, sessionSpaceInfoFrom(controlplane.SessionSpaceResult{Space: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateSessionSpace(ctx context.Context, id string, opts UpdateSessionSpaceOptions) (SessionSpaceInfo, error) {
+	var description *string
+	if opts.Description != nil {
+		value := *opts.Description
+		description = &value
+	}
+	out, err := c.service.UpdateSessionSpace(ctx, id, controlplane.UpdateSessionSpaceRequest{Name: opts.Name, Description: description})
+	if err != nil {
+		return SessionSpaceInfo{}, withResourceError(normalizeError("SessionSpaces.Update", err), "session_space", id)
+	}
+	return sessionSpaceInfoFrom(out), nil
+}
+
+func (c *controlAdapter) DeleteSessionSpace(ctx context.Context, id string) error {
+	return withResourceError(normalizeError("SessionSpaces.Delete", c.service.DeleteSessionSpace(ctx, id)), "session_space", id)
+}
+
+func (c *controlAdapter) CreateSession(ctx context.Context, opts CreateSessionOptions) (SessionInfo, error) {
+	out, err := c.service.CreateSession(ctx, controlplane.CreateSessionRequest{Ref: controlSessionRef(opts.Ref), Title: opts.Title, State: controlSessionState(opts.State), Metadata: controlSessionMetadata(opts.Metadata)})
+	if err != nil {
+		return SessionInfo{}, normalizeError("Sessions.Create", err)
+	}
+	return sessionInfoFrom(out), nil
+}
+
+func (c *controlAdapter) GetSession(ctx context.Context, ref SessionRef) (SessionInfo, error) {
+	out, err := c.service.GetSession(ctx, controlSessionRef(ref))
+	if err != nil {
+		return SessionInfo{}, withResourceError(normalizeError("Sessions.Get", err), "session", ref.SessionID)
+	}
+	return sessionInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListSessions(ctx context.Context, opts SessionListOptions) (SessionPage, error) {
+	in := controlplane.SessionListRequest{SpaceID: opts.SpaceID, UserIDs: append([]string(nil), opts.UserIDs...), SessionIDs: append([]string(nil), opts.SessionIDs...), Filters: controlSessionFilters(opts.Filters), Offset: opts.Offset, Limit: opts.Limit}
+	out, err := c.service.ListSessions(ctx, in)
+	if err != nil {
+		return SessionPage{}, normalizeError("Sessions.List", err)
+	}
+	page := SessionPage{Items: make([]SessionInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, sessionInfoFrom(controlplane.SessionResult{Session: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateSession(ctx context.Context, ref SessionRef, opts UpdateSessionOptions) (SessionInfo, error) {
+	in := controlplane.UpdateSessionRequest{Title: opts.Title}
+	if opts.Metadata != nil {
+		values := controlSessionMetadata(*opts.Metadata)
+		in.Metadata = &values
+	}
+	out, err := c.service.UpdateSession(ctx, controlSessionRef(ref), in)
+	if err != nil {
+		return SessionInfo{}, withResourceError(normalizeError("Sessions.Update", err), "session", ref.SessionID)
+	}
+	return sessionInfoFrom(out), nil
+}
+
+func (c *controlAdapter) DeleteSession(ctx context.Context, ref SessionRef) error {
+	return withResourceError(normalizeError("Sessions.Delete", c.service.DeleteSession(ctx, controlSessionRef(ref))), "session", ref.SessionID)
+}
+
+func (c *controlAdapter) AppendEvent(ctx context.Context, ref SessionRef, event EventInput) (EventInfo, error) {
+	out, err := c.service.AppendEvent(ctx, controlSessionRef(ref), controlEvent(event))
+	if err != nil {
+		return EventInfo{}, withResourceError(normalizeError("Sessions.AppendEvent", err), "session", ref.SessionID)
+	}
+	return eventInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListEvents(ctx context.Context, ref SessionRef, opts EventListOptions) (EventPage, error) {
+	in := controlplane.EventListRequest{Ref: controlSessionRef(ref), Author: opts.Author, AfterTimestamp: opts.AfterTimestamp, Offset: opts.Offset, Limit: opts.Limit}
+	out, err := c.service.ListEvents(ctx, in)
+	if err != nil {
+		return EventPage{}, withResourceError(normalizeError("Sessions.ListEvents", err), "session", ref.SessionID)
+	}
+	page := EventPage{Items: make([]EventInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, eventInfoFrom(controlplane.EventResult{Event: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func controlSessionFilters(values []SessionFilter) []controlplane.SessionFilter {
+	out := make([]controlplane.SessionFilter, len(values))
+	for i, value := range values {
+		out[i] = controlplane.SessionFilter{Name: value.Name, Values: append([]string(nil), value.Values...)}
+	}
+	return out
+}
+func controlSessionMetadata(values []SessionMetadata) []controlplane.SessionMetadata {
+	out := make([]controlplane.SessionMetadata, len(values))
+	for i, value := range values {
+		out[i] = controlplane.SessionMetadata{Name: value.Name, Value: value.Value}
+	}
+	return out
+}
+func controlSessionRef(value SessionRef) controlplane.SessionRef {
+	return controlplane.SessionRef{SpaceID: value.SpaceID, UserID: value.UserID, SessionID: value.SessionID}
+}
+func controlSessionState(value SessionState) controlplane.SessionState {
+	return controlplane.SessionState{CustomState: append(json.RawMessage(nil), value.CustomState...)}
+}
+func sessionSpaceInfoFrom(value controlplane.SessionSpaceResult) SessionSpaceInfo {
+	return SessionSpaceInfo{ID: value.Space.ID, Name: value.Space.Name, Description: value.Space.Description, Status: SessionSpaceStatus(value.Space.Status), Default: value.Space.Default, CreatedAt: value.Space.CreatedAt, UpdatedAt: value.Space.UpdatedAt, RequestID: value.RequestID}
+}
+func sessionInfoFrom(value controlplane.SessionResult) SessionInfo {
+	out := SessionInfo{Ref: SessionRef{SpaceID: value.Session.Ref.SpaceID, UserID: value.Session.Ref.UserID, SessionID: value.Session.Ref.SessionID}, Title: value.Session.Title, State: SessionState{CustomState: append(json.RawMessage(nil), value.Session.State.CustomState...)}, EventCount: value.Session.EventCount, CreatedAt: value.Session.CreatedAt, UpdatedAt: value.Session.UpdatedAt, RequestID: value.RequestID, Metadata: make([]SessionMetadata, len(value.Session.Metadata))}
+	for i, item := range value.Session.Metadata {
+		out.Metadata[i] = SessionMetadata{Name: item.Name, Value: item.Value}
+	}
+	return out
+}
+func controlEvent(value EventInput) controlplane.Event {
+	out := controlplane.Event{ID: value.ID, InvocationID: value.InvocationID, Author: value.Author, Metadata: append(json.RawMessage(nil), value.Metadata...), Extensions: append(json.RawMessage(nil), value.Extensions...), ErrorCode: value.ErrorCode, ErrorMessage: value.ErrorMessage}
+	if value.Actions != nil {
+		out.Actions = &controlplane.EventActions{StateDelta: append(json.RawMessage(nil), value.Actions.StateDelta...)}
+	}
+	if value.Content != nil {
+		out.Content = &controlplane.EventContent{Role: value.Content.Role, Parts: make([]controlplane.EventPart, len(value.Content.Parts))}
+		for i, part := range value.Content.Parts {
+			out.Content.Parts[i] = controlplane.EventPart{Text: part.Text, Thought: part.Thought, FunctionCall: append(json.RawMessage(nil), part.FunctionCall...), FunctionResponse: append(json.RawMessage(nil), part.FunctionResponse...)}
+			if part.InlineData != nil {
+				out.Content.Parts[i].InlineData = &controlplane.InlineData{MIMEType: part.InlineData.MIMEType, Data: part.InlineData.Data}
+			}
+		}
+	}
+	return out
+}
+func eventInfoFrom(value controlplane.EventResult) EventInfo {
+	event := EventInput{ID: value.Event.ID, InvocationID: value.Event.InvocationID, Author: value.Event.Author, Metadata: append(json.RawMessage(nil), value.Event.Metadata...), Extensions: append(json.RawMessage(nil), value.Event.Extensions...), ErrorCode: value.Event.ErrorCode, ErrorMessage: value.Event.ErrorMessage}
+	if value.Event.Actions != nil {
+		event.Actions = &EventActions{StateDelta: append(json.RawMessage(nil), value.Event.Actions.StateDelta...)}
+	}
+	if value.Event.Content != nil {
+		event.Content = &EventContent{Role: value.Event.Content.Role, Parts: make([]EventPart, len(value.Event.Content.Parts))}
+		for i, part := range value.Event.Content.Parts {
+			event.Content.Parts[i] = EventPart{Text: part.Text, Thought: part.Thought, FunctionCall: append(json.RawMessage(nil), part.FunctionCall...), FunctionResponse: append(json.RawMessage(nil), part.FunctionResponse...)}
+			if part.InlineData != nil {
+				event.Content.Parts[i].InlineData = &EventInlineData{MIMEType: part.InlineData.MIMEType, Data: part.InlineData.Data}
+			}
+		}
+	}
+	return EventInfo{EventInput: event, Timestamp: value.Event.Timestamp, RequestID: value.RequestID}
 }
 
 func (c *controlAdapter) acquireDeploymentToken(ctx context.Context, id string) (deploymentAccess, error) {

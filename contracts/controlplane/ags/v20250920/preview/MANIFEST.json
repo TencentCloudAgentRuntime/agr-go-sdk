@@ -8,9 +8,9 @@
   "source_schema_sha256": "d09e09e9a53ef59521c36f7c3cd5eeb78ce4aef64b0832ba4862abe82a183744",
   "source_patch_sha256": "56544a0b5b4a14c59a1caedfc74d9486358fd42e6868d95f15e2a33b4ed09ef0",
   "source_effective_sha256": "32519794cc2df4c7515f1fd223515735135480dedb4408cd8fe9669e911bab88",
-  "sdk_effective_sha256": "1676f441c4007a5ddd15ff2d6075b512d9928d442453bdd028859c4587e0c21e",
-  "sdk_effective_actions": 27,
-  "sdk_effective_objects": 96,
+  "sdk_effective_sha256": "6894d6357e6cc21445c97c9bd4f47bba72328c814edbdd234058965777bd8beb",
+  "sdk_effective_actions": 39,
+  "sdk_effective_objects": 129,
   "field_maturity_default": "stable",
   "preview_fields": [
     {
@@ -47,6 +47,24 @@
       "objects": [
         "AcquireSandboxInstanceTokenRequest",
         "AcquireSandboxInstanceTokenResponse"
+      ]
+    },
+    {
+      "name": "AppendEvent",
+      "resource": "session_event",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "AppendEventRequest",
+      "response": "AppendEventResponse",
+      "objects": [
+        "AppendEventRequest",
+        "AppendEventResponse",
+        "EventActionsInfo",
+        "EventContentInfo",
+        "EventInfo",
+        "EventInput",
+        "EventPartInfo",
+        "InlineDataInfo"
       ]
     },
     {
@@ -115,6 +133,35 @@
       ]
     },
     {
+      "name": "CreateSession",
+      "resource": "session",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CreateSessionRequest",
+      "response": "CreateSessionResponse",
+      "objects": [
+        "CreateSessionRequest",
+        "CreateSessionResponse",
+        "MetadataVar",
+        "SessionInfo",
+        "SessionState"
+      ]
+    },
+    {
+      "name": "CreateSessionSpace",
+      "resource": "session_space",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CreateSessionSpaceRequest",
+      "response": "CreateSessionSpaceResponse",
+      "objects": [
+        "CreateSessionSpaceRequest",
+        "CreateSessionSpaceResponse",
+        "SessionSpaceInfo",
+        "Tag"
+      ]
+    },
+    {
       "name": "CreateVolume",
       "resource": "volume",
       "maturity": "preview",
@@ -170,6 +217,30 @@
       "objects": [
         "DeleteSandboxToolRequest",
         "DeleteSandboxToolResponse"
+      ]
+    },
+    {
+      "name": "DeleteSession",
+      "resource": "session",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DeleteSessionRequest",
+      "response": "DeleteSessionResponse",
+      "objects": [
+        "DeleteSessionRequest",
+        "DeleteSessionResponse"
+      ]
+    },
+    {
+      "name": "DeleteSessionSpace",
+      "resource": "session_space",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DeleteSessionSpaceRequest",
+      "response": "DeleteSessionSpaceResponse",
+      "objects": [
+        "DeleteSessionSpaceRequest",
+        "DeleteSessionSpaceResponse"
       ]
     },
     {
@@ -229,6 +300,23 @@
         "LifecycleConfiguration",
         "ScalingConfiguration",
         "Tag"
+      ]
+    },
+    {
+      "name": "DescribeEvents",
+      "resource": "session_event",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeEventsRequest",
+      "response": "DescribeEventsResponse",
+      "objects": [
+        "DescribeEventsRequest",
+        "DescribeEventsResponse",
+        "EventActionsInfo",
+        "EventContentInfo",
+        "EventInfo",
+        "EventPartInfo",
+        "InlineDataInfo"
       ]
     },
     {
@@ -308,6 +396,64 @@
       ]
     },
     {
+      "name": "DescribeSession",
+      "resource": "session",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeSessionRequest",
+      "response": "DescribeSessionResponse",
+      "objects": [
+        "DescribeSessionRequest",
+        "DescribeSessionResponse",
+        "MetadataVar",
+        "SessionInfo",
+        "SessionState"
+      ]
+    },
+    {
+      "name": "DescribeSessionSpace",
+      "resource": "session_space",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeSessionSpaceRequest",
+      "response": "DescribeSessionSpaceResponse",
+      "objects": [
+        "DescribeSessionSpaceRequest",
+        "DescribeSessionSpaceResponse",
+        "SessionSpaceInfo"
+      ]
+    },
+    {
+      "name": "DescribeSessionSpaces",
+      "resource": "session_space",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeSessionSpacesRequest",
+      "response": "DescribeSessionSpacesResponse",
+      "objects": [
+        "DescribeSessionSpacesRequest",
+        "DescribeSessionSpacesResponse",
+        "Filter",
+        "SessionSpaceInfo"
+      ]
+    },
+    {
+      "name": "DescribeSessions",
+      "resource": "session",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeSessionsRequest",
+      "response": "DescribeSessionsResponse",
+      "objects": [
+        "DescribeSessionsRequest",
+        "DescribeSessionsResponse",
+        "Filter",
+        "MetadataVar",
+        "SessionInfo",
+        "SessionState"
+      ]
+    },
+    {
       "name": "DescribeVolumeList",
       "resource": "volume",
       "maturity": "preview",
@@ -358,6 +504,34 @@
         "ModifyDeploymentResponse",
         "ScalingConfiguration",
         "Tag"
+      ]
+    },
+    {
+      "name": "ModifySession",
+      "resource": "session",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "ModifySessionRequest",
+      "response": "ModifySessionResponse",
+      "objects": [
+        "MetadataVar",
+        "ModifySessionRequest",
+        "ModifySessionResponse",
+        "SessionInfo",
+        "SessionState"
+      ]
+    },
+    {
+      "name": "ModifySessionSpace",
+      "resource": "session_space",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "ModifySessionSpaceRequest",
+      "response": "ModifySessionSpaceResponse",
+      "objects": [
+        "ModifySessionSpaceRequest",
+        "ModifySessionSpaceResponse",
+        "SessionSpaceInfo"
       ]
     },
     {

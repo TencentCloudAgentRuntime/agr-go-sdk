@@ -78,6 +78,19 @@ func TestArchitectureBoundaryRejectsUnapprovedAndForbiddenRootFiles(t *testing.T
 	}
 }
 
+func TestArchitectureBoundaryAllowsSessionsFacadeButRejectsAnotherRootFile(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "sessions.go", "package agr\n")
+	if failures := architectureBoundaryFailures(root); len(failures) != 0 {
+		t.Fatalf("sessions facade failures = %v", failures)
+	}
+	writeFixture(t, root, "session_transport.go", "package agr\n")
+	failures := architectureBoundaryFailures(root)
+	if !containsFailure(failures, "not an approved public-root") {
+		t.Fatalf("failures = %v", failures)
+	}
+}
+
 func TestArchitectureBoundaryRejectsRootCloudSDKImport(t *testing.T) {
 	root := t.TempDir()
 	writeFixture(t, root, "client.go", `package agr

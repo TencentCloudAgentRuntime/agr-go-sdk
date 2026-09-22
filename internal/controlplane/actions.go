@@ -6,8 +6,8 @@ type ActionRoute string
 const (
 	// OfficialTyped binds an action directly to the generated Tencent Cloud client method.
 	OfficialTyped ActionRoute = "official_typed"
-	// CommonRaw is reserved for an allowlisted effective-API action that the official SDK has
-	// not generated yet. No action currently uses this route and it is never a failure fallback.
+	// CommonRaw binds an allowlisted effective-API action that the official SDK has not generated.
+	// It is never a failure fallback.
 	CommonRaw ActionRoute = "common_raw"
 )
 
@@ -16,23 +16,35 @@ var actionRoutes = map[string]ActionRoute{
 	"StartSandboxInstance":        OfficialTyped,
 	"DescribeSandboxInstanceList": OfficialTyped,
 	"AcquireSandboxInstanceToken": OfficialTyped,
+	"AppendEvent":                 CommonRaw,
 	"CreatePreCacheImageTask":     OfficialTyped,
 	"CreateDeployment":            OfficialTyped,
 	"CreateSandboxTool":           OfficialTyped,
+	"CreateSession":               CommonRaw,
+	"CreateSessionSpace":          CommonRaw,
 	"CreateVolume":                CommonRaw,
 	"CreateVolumeTemplate":        CommonRaw,
 	"DeleteSandboxTool":           OfficialTyped,
 	"DeleteDeployment":            OfficialTyped,
+	"DeleteSession":               CommonRaw,
+	"DeleteSessionSpace":          CommonRaw,
 	"DeleteVolume":                CommonRaw,
 	"DeleteVolumeTemplate":        CommonRaw,
 	"DescribeDeployment":          OfficialTyped,
 	"DescribeDeploymentList":      OfficialTyped,
+	"DescribeEvents":              CommonRaw,
 	"DescribePreCacheImageTask":   OfficialTyped,
 	"DescribeSandboxToolList":     OfficialTyped,
+	"DescribeSession":             CommonRaw,
+	"DescribeSessionSpace":        CommonRaw,
+	"DescribeSessionSpaces":       CommonRaw,
+	"DescribeSessions":            CommonRaw,
 	"DescribeVolumeList":          CommonRaw,
 	"DescribeVolumeTemplateList":  CommonRaw,
 	"PauseSandboxInstance":        OfficialTyped,
 	"ModifyDeployment":            OfficialTyped,
+	"ModifySession":               CommonRaw,
+	"ModifySessionSpace":          CommonRaw,
 	"ResumeSandboxInstance":       OfficialTyped,
 	"StopSandboxInstance":         OfficialTyped,
 	"UpdateSandboxInstance":       OfficialTyped,
