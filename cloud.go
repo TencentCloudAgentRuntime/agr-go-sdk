@@ -278,16 +278,16 @@ func (c *controlAdapter) ListVolumes(ctx context.Context, opts VolumeListOptions
 	return page, nil
 }
 
-func (c *controlAdapter) UpdateVolume(ctx context.Context, id string, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
-	out, err := c.service.UpdateVolume(ctx, id, controlUpdateVolume(opts))
+func (c *controlAdapter) UpdateVolume(ctx context.Context, target volumeTarget, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
+	out, err := c.service.UpdateVolume(ctx, controlVolumeTarget(target), controlUpdateVolume(opts))
 	if err != nil {
-		return VolumeMutationResult{}, withResourceError(normalizeError("Volumes.Update", err), "volume", id)
+		return VolumeMutationResult{}, withResourceError(normalizeError("Volumes.Update", err), "volume", volumeTargetLabel(target))
 	}
 	return VolumeMutationResult{VolumeID: out.ResourceID, RequestID: out.RequestID}, nil
 }
 
-func (c *controlAdapter) DeleteVolume(ctx context.Context, id string) error {
-	return withResourceError(normalizeError("Volumes.Delete", c.service.DeleteVolume(ctx, id)), "volume", id)
+func (c *controlAdapter) DeleteVolume(ctx context.Context, target volumeTarget) error {
+	return withResourceError(normalizeError("Volumes.Delete", c.service.DeleteVolume(ctx, controlVolumeTarget(target))), "volume", volumeTargetLabel(target))
 }
 
 func (c *controlAdapter) CreateVolumeTemplate(ctx context.Context, opts CreateVolumeTemplateOptions) (VolumeTemplateInfo, error) {
@@ -322,16 +322,16 @@ func (c *controlAdapter) ListVolumeTemplates(ctx context.Context, opts VolumeTem
 	return page, nil
 }
 
-func (c *controlAdapter) UpdateVolumeTemplate(ctx context.Context, id string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
-	out, err := c.service.UpdateVolumeTemplate(ctx, id, controlUpdateVolumeTemplate(opts))
+func (c *controlAdapter) UpdateVolumeTemplate(ctx context.Context, target volumeTarget, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
+	out, err := c.service.UpdateVolumeTemplate(ctx, controlVolumeTarget(target), controlUpdateVolumeTemplate(opts))
 	if err != nil {
-		return VolumeTemplateMutationResult{}, withResourceError(normalizeError("VolumeTemplates.Update", err), "volume_template", id)
+		return VolumeTemplateMutationResult{}, withResourceError(normalizeError("VolumeTemplates.Update", err), "volume_template", volumeTargetLabel(target))
 	}
 	return VolumeTemplateMutationResult{VolumeTemplateID: out.ResourceID, RequestID: out.RequestID}, nil
 }
 
-func (c *controlAdapter) DeleteVolumeTemplate(ctx context.Context, id string) error {
-	return withResourceError(normalizeError("VolumeTemplates.Delete", c.service.DeleteVolumeTemplate(ctx, id)), "volume_template", id)
+func (c *controlAdapter) DeleteVolumeTemplate(ctx context.Context, target volumeTarget) error {
+	return withResourceError(normalizeError("VolumeTemplates.Delete", c.service.DeleteVolumeTemplate(ctx, controlVolumeTarget(target))), "volume_template", volumeTargetLabel(target))
 }
 
 func (c *controlAdapter) CreateSessionSpace(ctx context.Context, opts CreateSessionSpaceOptions) (SessionSpaceInfo, error) {
@@ -873,6 +873,17 @@ func controlUpdateVolume(value UpdateVolumeOptions) controlplane.UpdateVolumeReq
 		out.Tags = &tags
 	}
 	return out
+}
+
+func controlVolumeTarget(value volumeTarget) controlplane.VolumeTarget {
+	return controlplane.VolumeTarget{ID: value.id, Name: value.name}
+}
+
+func volumeTargetLabel(value volumeTarget) string {
+	if value.id != "" {
+		return value.id
+	}
+	return value.name
 }
 
 func controlUpdateVolumeTemplate(value UpdateVolumeTemplateOptions) controlplane.UpdateVolumeTemplateRequest {

@@ -67,6 +67,13 @@ func TestVolumeAndTemplateCommonRequestMapping(t *testing.T) {
 	if err := client.Volumes().Delete(context.Background(), "vol-created"); err != nil {
 		t.Fatal(err)
 	}
+	byName, err := client.Volumes().UpdateByName(context.Background(), "workspace", UpdateVolumeOptions{Tags: &emptyTags})
+	if err != nil || byName.VolumeID != "" || byName.RequestID == "" {
+		t.Fatalf("name mutation=%+v err=%v", byName, err)
+	}
+	if err := client.Volumes().DeleteByName(context.Background(), "workspace"); err != nil {
+		t.Fatal(err)
+	}
 
 	template, err := client.VolumeTemplates().Create(context.Background(), CreateVolumeTemplateOptions{Name: "workspace-template", AccessMode: VolumeReadWriteMany, ReclaimPolicy: VolumeReclaimRetain, StorageType: VolumeStorageCFS, Storage: VolumeTemplateStorage{CFS: &VolumeTemplateCFSStorage{FileSystemID: "cfs-fixture", PathPattern: "/sdk/${reuse_key}"}}, VolumeNamePattern: "workspace-${reuse_key}", Tags: []VolumeTag{{Key: "owner", Value: "sdk"}}, ClientToken: "template-token"})
 	if err != nil || template.ID != "volt-created" || template.RequestID == "" {
@@ -82,6 +89,13 @@ func TestVolumeAndTemplateCommonRequestMapping(t *testing.T) {
 		t.Fatalf("template mutation=%+v err=%v", templateMutation, err)
 	}
 	if err := client.VolumeTemplates().Delete(context.Background(), "volt-created"); err != nil {
+		t.Fatal(err)
+	}
+	templateByName, err := client.VolumeTemplates().UpdateByName(context.Background(), "workspace-template", UpdateVolumeTemplateOptions{Tags: &emptyTags})
+	if err != nil || templateByName.VolumeTemplateID != "" || templateByName.RequestID == "" {
+		t.Fatalf("template name mutation=%+v err=%v", templateByName, err)
+	}
+	if err := client.VolumeTemplates().DeleteByName(context.Background(), "workspace-template"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -104,6 +118,14 @@ func TestVolumeAndTemplateCommonRequestMapping(t *testing.T) {
 	if tags, ok := updateBody["Tags"].([]any); !ok || len(tags) != 0 || updateBody["VolumeName"] != nil {
 		t.Fatalf("UpdateVolume body=%#v", updateBody)
 	}
+	nameUpdateBody := bodies["UpdateVolume"][1]
+	if nameUpdateBody["VolumeName"] != "workspace" || nameUpdateBody["VolumeId"] != nil {
+		t.Fatalf("UpdateVolume by name body=%#v", nameUpdateBody)
+	}
+	nameDeleteBody := bodies["DeleteVolume"][1]
+	if nameDeleteBody["VolumeName"] != "workspace" || nameDeleteBody["VolumeId"] != nil {
+		t.Fatalf("DeleteVolume by name body=%#v", nameDeleteBody)
+	}
 	templateBody := bodies["CreateVolumeTemplate"][0]
 	if templateBody["VolumeTemplateName"] != "workspace-template" || templateBody["Name"] != nil || templateBody["StorageSpec"] == nil {
 		t.Fatalf("CreateVolumeTemplate body=%#v", templateBody)
@@ -111,6 +133,14 @@ func TestVolumeAndTemplateCommonRequestMapping(t *testing.T) {
 	templateUpdate := bodies["UpdateVolumeTemplate"][0]
 	if value, ok := templateUpdate["DefaultCapacity"]; !ok || value != "" {
 		t.Fatalf("explicit empty capacity lost: %#v", templateUpdate)
+	}
+	templateNameUpdate := bodies["UpdateVolumeTemplate"][1]
+	if templateNameUpdate["VolumeTemplateName"] != "workspace-template" || templateNameUpdate["VolumeTemplateId"] != nil {
+		t.Fatalf("UpdateVolumeTemplate by name body=%#v", templateNameUpdate)
+	}
+	templateNameDelete := bodies["DeleteVolumeTemplate"][1]
+	if templateNameDelete["VolumeTemplateName"] != "workspace-template" || templateNameDelete["VolumeTemplateId"] != nil {
+		t.Fatalf("DeleteVolumeTemplate by name body=%#v", templateNameDelete)
 	}
 }
 
@@ -380,7 +410,6 @@ func TestToolPreviewVolumeMountValidationAndCopy(t *testing.T) {
 		{{Name: "both-identities", Volume: &ToolVolumeRef{ID: "vol", Name: "volume"}}},
 		{{Name: "missing-identity", Volume: &ToolVolumeRef{}}},
 		{{Name: "missing-template-name", VolumeTemplate: &ToolVolumeTemplateRef{ReuseKey: "key"}}},
-		{{Name: "missing-reuse-key", VolumeTemplate: &ToolVolumeTemplateRef{Name: "template"}}},
 	}
 	for _, mounts := range invalid {
 		value := base
@@ -391,6 +420,9 @@ func TestToolPreviewVolumeMountValidationAndCopy(t *testing.T) {
 	}
 	if calls.Load() != 0 {
 		t.Fatalf("invalid mounts made %d network calls", calls.Load())
+	}
+	if err := validateToolMounts([]ToolStorageMount{{Name: "optional-reuse", VolumeTemplate: &ToolVolumeTemplateRef{Name: "template"}}}, "Tools.Create"); err != nil {
+		t.Fatalf("optional ReuseKey was rejected: %v", err)
 	}
 	volume := &ToolVolumeRef{ID: "before"}
 	template := &ToolVolumeTemplateRef{Name: "before", ReuseKey: "${metadata.session_id}"}

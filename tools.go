@@ -748,7 +748,7 @@ func validateToolMounts(values []ToolStorageMount, operation string) error {
 				return codeError(InvalidArgument, operation, "VOLUME_REF_INVALID")
 			}
 		}
-		if mount.VolumeTemplate != nil && (mount.VolumeTemplate.Name == "" || mount.VolumeTemplate.ReuseKey == "") {
+		if mount.VolumeTemplate != nil && mount.VolumeTemplate.Name == "" {
 			return codeError(InvalidArgument, operation, "VOLUME_TEMPLATE_REF_INVALID")
 		}
 	}
@@ -1041,6 +1041,8 @@ type UpdateVolumeOptions struct {
 	Tags *[]VolumeTag
 }
 
+type volumeTarget struct{ id, name string }
+
 // VolumeInfo is an immutable service snapshot.
 type VolumeInfo struct {
 	// ID is the stable Volume identity.
@@ -1086,7 +1088,7 @@ func (v VolumeInfo) GoString() string { return v.String() }
 
 // VolumeMutationResult confirms an accepted mutation.
 type VolumeMutationResult struct {
-	// VolumeID identifies the mutation target.
+	// VolumeID identifies an ID-selected mutation target. It is empty for UpdateByName.
 	VolumeID string
 	// RequestID is service correlation data.
 	RequestID string
@@ -1108,8 +1110,8 @@ type volumeControlPlane interface {
 	CreateVolume(context.Context, CreateVolumeOptions) (VolumeInfo, error)
 	GetVolume(context.Context, string) (VolumeInfo, error)
 	ListVolumes(context.Context, VolumeListOptions) (VolumePage, error)
-	UpdateVolume(context.Context, string, UpdateVolumeOptions) (VolumeMutationResult, error)
-	DeleteVolume(context.Context, string) error
+	UpdateVolume(context.Context, volumeTarget, UpdateVolumeOptions) (VolumeMutationResult, error)
+	DeleteVolume(context.Context, volumeTarget) error
 }
 
 // VolumeManager manages Preview Volumes for one Client identity and region.
@@ -1177,7 +1179,23 @@ func (m *VolumeManager) Update(ctx context.Context, id string, opts UpdateVolume
 	if err != nil {
 		return VolumeMutationResult{}, err
 	}
-	return cp.UpdateVolume(ctx, id, opts)
+	return cp.UpdateVolume(ctx, volumeTarget{id: id}, opts)
+}
+
+// UpdateByName replaces mutable fields on one exact account-local Volume name.
+func (m *VolumeManager) UpdateByName(ctx context.Context, name string, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
+	if strings.TrimSpace(name) == "" {
+		return VolumeMutationResult{}, codeError(InvalidArgument, "Volumes.Update", "VOLUME_NAME_REQUIRED")
+	}
+	opts = copyUpdateVolumeOptions(opts)
+	if opts.Tags == nil {
+		return VolumeMutationResult{}, codeError(InvalidArgument, "Volumes.Update", "UPDATE_REQUIRED")
+	}
+	cp, err := m.transport("Volumes.Update")
+	if err != nil {
+		return VolumeMutationResult{}, err
+	}
+	return cp.UpdateVolume(ctx, volumeTarget{name: name}, opts)
 }
 
 // Delete removes the Volume record and does not claim to delete backing storage.
@@ -1189,7 +1207,19 @@ func (m *VolumeManager) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return cp.DeleteVolume(ctx, id)
+	return cp.DeleteVolume(ctx, volumeTarget{id: id})
+}
+
+// DeleteByName removes the Volume record selected by one exact account-local name.
+func (m *VolumeManager) DeleteByName(ctx context.Context, name string) error {
+	if strings.TrimSpace(name) == "" {
+		return codeError(InvalidArgument, "Volumes.Delete", "VOLUME_NAME_REQUIRED")
+	}
+	cp, err := m.transport("Volumes.Delete")
+	if err != nil {
+		return err
+	}
+	return cp.DeleteVolume(ctx, volumeTarget{name: name})
 }
 
 func validateCreateVolume(value CreateVolumeOptions) error {
@@ -1426,7 +1456,7 @@ func (v VolumeTemplateInfo) GoString() string { return v.String() }
 
 // VolumeTemplateMutationResult confirms an accepted mutation.
 type VolumeTemplateMutationResult struct {
-	// VolumeTemplateID identifies the mutation target.
+	// VolumeTemplateID identifies an ID-selected mutation target. It is empty for UpdateByName.
 	VolumeTemplateID string
 	// RequestID is service correlation data.
 	RequestID string
@@ -1448,8 +1478,8 @@ type volumeTemplateControlPlane interface {
 	CreateVolumeTemplate(context.Context, CreateVolumeTemplateOptions) (VolumeTemplateInfo, error)
 	GetVolumeTemplate(context.Context, string) (VolumeTemplateInfo, error)
 	ListVolumeTemplates(context.Context, VolumeTemplateListOptions) (VolumeTemplatePage, error)
-	UpdateVolumeTemplate(context.Context, string, UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error)
-	DeleteVolumeTemplate(context.Context, string) error
+	UpdateVolumeTemplate(context.Context, volumeTarget, UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error)
+	DeleteVolumeTemplate(context.Context, volumeTarget) error
 }
 
 // VolumeTemplateManager manages Preview templates for one Client identity and region.
@@ -1517,7 +1547,23 @@ func (m *VolumeTemplateManager) Update(ctx context.Context, id string, opts Upda
 	if err != nil {
 		return VolumeTemplateMutationResult{}, err
 	}
-	return cp.UpdateVolumeTemplate(ctx, id, opts)
+	return cp.UpdateVolumeTemplate(ctx, volumeTarget{id: id}, opts)
+}
+
+// UpdateByName replaces mutable fields on one exact account-local VolumeTemplate name.
+func (m *VolumeTemplateManager) UpdateByName(ctx context.Context, name string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
+	if strings.TrimSpace(name) == "" {
+		return VolumeTemplateMutationResult{}, codeError(InvalidArgument, "VolumeTemplates.Update", "VOLUME_TEMPLATE_NAME_REQUIRED")
+	}
+	opts = copyUpdateVolumeTemplateOptions(opts)
+	if opts.Tags == nil && opts.DefaultCapacity == nil {
+		return VolumeTemplateMutationResult{}, codeError(InvalidArgument, "VolumeTemplates.Update", "UPDATE_REQUIRED")
+	}
+	cp, err := m.transport("VolumeTemplates.Update")
+	if err != nil {
+		return VolumeTemplateMutationResult{}, err
+	}
+	return cp.UpdateVolumeTemplate(ctx, volumeTarget{name: name}, opts)
 }
 
 // Delete removes one exact VolumeTemplate ID after dependent Volumes are gone.
@@ -1529,7 +1575,19 @@ func (m *VolumeTemplateManager) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return cp.DeleteVolumeTemplate(ctx, id)
+	return cp.DeleteVolumeTemplate(ctx, volumeTarget{id: id})
+}
+
+// DeleteByName removes one VolumeTemplate selected by its exact account-local name.
+func (m *VolumeTemplateManager) DeleteByName(ctx context.Context, name string) error {
+	if strings.TrimSpace(name) == "" {
+		return codeError(InvalidArgument, "VolumeTemplates.Delete", "VOLUME_TEMPLATE_NAME_REQUIRED")
+	}
+	cp, err := m.transport("VolumeTemplates.Delete")
+	if err != nil {
+		return err
+	}
+	return cp.DeleteVolumeTemplate(ctx, volumeTarget{name: name})
 }
 
 func validateCreateVolumeTemplate(value CreateVolumeTemplateOptions) error {

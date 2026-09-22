@@ -29,6 +29,8 @@ source-incompatible changes.
 - Preview `Volume` and `VolumeTemplate` managers with create/get/list/update/delete operations,
   plus Tool mounts by Volume ID/name or VolumeTemplate reuse key and a persistent-storage
   cookbook journey.
+- Preview Volume and VolumeTemplate mutations by exact account-local name; Tool template mounts
+  may omit `ReuseKey` when the service-side template does not require one.
 - Preview `SessionSpace` and `Session` managers covering 12 reviewed Actions, bounded structured
   state and Events, explicit three-part Session identity, a cookbook journey, and Shanghai Cloud
   E2E coverage.

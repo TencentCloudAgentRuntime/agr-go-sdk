@@ -84,6 +84,8 @@ type VolumeListRequest struct {
 
 type UpdateVolumeRequest struct{ Tags *[]VolumeTag }
 
+type VolumeTarget struct{ ID, Name string }
+
 type UpdateVolumeTemplateRequest struct {
 	Tags            *[]VolumeTag
 	DefaultCapacity *string
@@ -134,14 +136,14 @@ func (s *Service) ListVolumes(ctx context.Context, request VolumeListRequest) (V
 	return out, cloudError(err, "DescribeVolumeList")
 }
 
-func (s *Service) UpdateVolume(ctx context.Context, id string, request UpdateVolumeRequest) (VolumeMutation, error) {
-	out, err := s.ags.UpdateVolume(ctx, id, request)
-	out.ResourceID = id
+func (s *Service) UpdateVolume(ctx context.Context, target VolumeTarget, request UpdateVolumeRequest) (VolumeMutation, error) {
+	out, err := s.ags.UpdateVolume(ctx, target, request)
+	out.ResourceID = target.ID
 	return out, cloudError(err, "UpdateVolume")
 }
 
-func (s *Service) DeleteVolume(ctx context.Context, id string) error {
-	return cloudError(s.ags.DeleteVolume(ctx, id), "DeleteVolume")
+func (s *Service) DeleteVolume(ctx context.Context, target VolumeTarget) error {
+	return cloudError(s.ags.DeleteVolume(ctx, target), "DeleteVolume")
 }
 
 func (s *Service) CreateVolumeTemplate(ctx context.Context, request CreateVolumeTemplateRequest) (VolumeTemplateResult, error) {
@@ -165,14 +167,14 @@ func (s *Service) ListVolumeTemplates(ctx context.Context, request VolumeListReq
 	return out, cloudError(err, "DescribeVolumeTemplateList")
 }
 
-func (s *Service) UpdateVolumeTemplate(ctx context.Context, id string, request UpdateVolumeTemplateRequest) (VolumeMutation, error) {
-	out, err := s.ags.UpdateVolumeTemplate(ctx, id, request)
-	out.ResourceID = id
+func (s *Service) UpdateVolumeTemplate(ctx context.Context, target VolumeTarget, request UpdateVolumeTemplateRequest) (VolumeMutation, error) {
+	out, err := s.ags.UpdateVolumeTemplate(ctx, target, request)
+	out.ResourceID = target.ID
 	return out, cloudError(err, "UpdateVolumeTemplate")
 }
 
-func (s *Service) DeleteVolumeTemplate(ctx context.Context, id string) error {
-	return cloudError(s.ags.DeleteVolumeTemplate(ctx, id), "DeleteVolumeTemplate")
+func (s *Service) DeleteVolumeTemplate(ctx context.Context, target VolumeTarget) error {
+	return cloudError(s.ags.DeleteVolumeTemplate(ctx, target), "DeleteVolumeTemplate")
 }
 
 type volumeCOSWire struct {
@@ -279,12 +281,14 @@ type volumeTemplateListWireRequest struct {
 }
 
 type updateVolumeWireRequest struct {
-	ID   string       `json:"VolumeId"`
+	ID   string       `json:"VolumeId,omitempty"`
+	Name string       `json:"VolumeName,omitempty"`
 	Tags *[]VolumeTag `json:"Tags,omitempty"`
 }
 
 type updateVolumeTemplateWireRequest struct {
-	ID              string       `json:"VolumeTemplateId"`
+	ID              string       `json:"VolumeTemplateId,omitempty"`
+	Name            string       `json:"VolumeTemplateName,omitempty"`
 	Tags            *[]VolumeTag `json:"Tags,omitempty"`
 	DefaultCapacity *string      `json:"DefaultCapacity,omitempty"`
 }
@@ -337,21 +341,22 @@ func (a *AGS) ListVolumes(ctx context.Context, in VolumeListRequest) (VolumePage
 	return out, nil
 }
 
-func (a *AGS) UpdateVolume(ctx context.Context, id string, in UpdateVolumeRequest) (VolumeMutation, error) {
-	request := updateVolumeWireRequest{ID: id, Tags: in.Tags}
+func (a *AGS) UpdateVolume(ctx context.Context, target VolumeTarget, in UpdateVolumeRequest) (VolumeMutation, error) {
+	request := updateVolumeWireRequest{ID: target.ID, Name: target.Name, Tags: in.Tags}
 	var response requestIDResponse
 	err := a.commonCall(ctx, "UpdateVolume", request, &response)
 	if err == nil && response.RequestID == "" {
 		err = malformedVolumeResponse("UpdateVolume response has no RequestId")
 	}
-	return VolumeMutation{ResourceID: id, RequestID: response.RequestID}, err
+	return VolumeMutation{ResourceID: target.ID, RequestID: response.RequestID}, err
 }
 
-func (a *AGS) DeleteVolume(ctx context.Context, id string) error {
+func (a *AGS) DeleteVolume(ctx context.Context, target VolumeTarget) error {
 	var response requestIDResponse
 	err := a.commonCall(ctx, "DeleteVolume", struct {
-		ID string `json:"VolumeId"`
-	}{ID: id}, &response)
+		ID   string `json:"VolumeId,omitempty"`
+		Name string `json:"VolumeName,omitempty"`
+	}{ID: target.ID, Name: target.Name}, &response)
 	if err == nil && response.RequestID == "" {
 		return malformedVolumeResponse("DeleteVolume response has no RequestId")
 	}
@@ -402,21 +407,22 @@ func (a *AGS) ListVolumeTemplates(ctx context.Context, in VolumeListRequest) (Vo
 	return out, nil
 }
 
-func (a *AGS) UpdateVolumeTemplate(ctx context.Context, id string, in UpdateVolumeTemplateRequest) (VolumeMutation, error) {
-	request := updateVolumeTemplateWireRequest{ID: id, Tags: in.Tags, DefaultCapacity: in.DefaultCapacity}
+func (a *AGS) UpdateVolumeTemplate(ctx context.Context, target VolumeTarget, in UpdateVolumeTemplateRequest) (VolumeMutation, error) {
+	request := updateVolumeTemplateWireRequest{ID: target.ID, Name: target.Name, Tags: in.Tags, DefaultCapacity: in.DefaultCapacity}
 	var response requestIDResponse
 	err := a.commonCall(ctx, "UpdateVolumeTemplate", request, &response)
 	if err == nil && response.RequestID == "" {
 		err = malformedVolumeResponse("UpdateVolumeTemplate response has no RequestId")
 	}
-	return VolumeMutation{ResourceID: id, RequestID: response.RequestID}, err
+	return VolumeMutation{ResourceID: target.ID, RequestID: response.RequestID}, err
 }
 
-func (a *AGS) DeleteVolumeTemplate(ctx context.Context, id string) error {
+func (a *AGS) DeleteVolumeTemplate(ctx context.Context, target VolumeTarget) error {
 	var response requestIDResponse
 	err := a.commonCall(ctx, "DeleteVolumeTemplate", struct {
-		ID string `json:"VolumeTemplateId"`
-	}{ID: id}, &response)
+		ID   string `json:"VolumeTemplateId,omitempty"`
+		Name string `json:"VolumeTemplateName,omitempty"`
+	}{ID: target.ID, Name: target.Name}, &response)
 	if err == nil && response.RequestID == "" {
 		return malformedVolumeResponse("DeleteVolumeTemplate response has no RequestId")
 	}

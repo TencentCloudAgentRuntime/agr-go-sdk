@@ -3248,6 +3248,10 @@ func (m *VolumeManager) Delete(ctx context.Context, id string) error
     Delete removes the Volume record and does not claim to delete backing
     storage.
 
+func (m *VolumeManager) DeleteByName(ctx context.Context, name string) error
+    DeleteByName removes the Volume record selected by one exact account-local
+    name.
+
 func (m *VolumeManager) Get(ctx context.Context, id string) (VolumeInfo, error)
     Get returns the exact Volume ID or NotFound.
 
@@ -3257,8 +3261,11 @@ func (m *VolumeManager) List(ctx context.Context, opts VolumeListOptions) (Volum
 func (m *VolumeManager) Update(ctx context.Context, id string, opts UpdateVolumeOptions) (VolumeMutationResult, error)
     Update replaces mutable fields on one exact Volume ID.
 
+func (m *VolumeManager) UpdateByName(ctx context.Context, name string, opts UpdateVolumeOptions) (VolumeMutationResult, error)
+    UpdateByName replaces mutable fields on one exact account-local Volume name.
+
 type VolumeMutationResult struct {
-	// VolumeID identifies the mutation target.
+	// VolumeID identifies an ID-selected mutation target. It is empty for UpdateByName.
 	VolumeID string
 	// RequestID is service correlation data.
 	RequestID string
@@ -3419,6 +3426,10 @@ func (m *VolumeTemplateManager) Create(ctx context.Context, opts CreateVolumeTem
 func (m *VolumeTemplateManager) Delete(ctx context.Context, id string) error
     Delete removes one exact VolumeTemplate ID after dependent Volumes are gone.
 
+func (m *VolumeTemplateManager) DeleteByName(ctx context.Context, name string) error
+    DeleteByName removes one VolumeTemplate selected by its exact account-local
+    name.
+
 func (m *VolumeTemplateManager) Get(ctx context.Context, id string) (VolumeTemplateInfo, error)
     Get returns the exact VolumeTemplate ID or NotFound.
 
@@ -3428,8 +3439,12 @@ func (m *VolumeTemplateManager) List(ctx context.Context, opts VolumeTemplateLis
 func (m *VolumeTemplateManager) Update(ctx context.Context, id string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error)
     Update replaces mutable fields on one exact VolumeTemplate ID.
 
+func (m *VolumeTemplateManager) UpdateByName(ctx context.Context, name string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error)
+    UpdateByName replaces mutable fields on one exact account-local
+    VolumeTemplate name.
+
 type VolumeTemplateMutationResult struct {
-	// VolumeTemplateID identifies the mutation target.
+	// VolumeTemplateID identifies an ID-selected mutation target. It is empty for UpdateByName.
 	VolumeTemplateID string
 	// RequestID is service correlation data.
 	RequestID string
