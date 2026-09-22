@@ -14,6 +14,7 @@ running it. All creation examples close local resources and delete only the inst
 | Create and observe image pre-cache | [07_pre_cache](07_pre_cache/main.go) | `pre-cache-image` |
 | Deployment control and HTTP/SSE/WebSocket data plane | [08_deployment](08_deployment/main.go) | Create, connect, delete |
 | Preview persistent Volume mounts | [09_persistent_volume](09_persistent_volume/main.go) | Volume, VolumeTemplate, Tool mount, Sandbox cleanup |
+| Preview Session state and Events | [10_session_events](10_session_events/main.go) | `session-events` |
 
 The journey IDs are machine-readable in [`contracts/journeys.json`](../../contracts/journeys.json).
 File streaming, Watch, PTY, lifecycle, and cleanup behavior are covered by the root README and
@@ -42,3 +43,9 @@ or CFS subpath. It never deletes the Bucket or CFS file system. Cleanup runs in 
 workload Sandbox, Tool, retained derived Volumes, VolumeTemplate, standalone Volume, fixture
 data, bootstrap Sandbox, then bootstrap Tool. For COS, use the Bucket-qualified endpoint
 `<bucket-appid>.cos.<region>.myqcloud.com`; the region-wide COS endpoint is not a Bucket identity.
+
+The Session example is available only from a Preview release and uses `ap-shanghai`. A
+SessionSpace is the isolation boundary for Session state and Events. It is independent of a
+Sandbox generation, a CodeContext, and Deployment affinity: pausing or deleting a Sandbox does
+not mutate Session state. The example deletes its Session before deleting only the SessionSpace
+it created.

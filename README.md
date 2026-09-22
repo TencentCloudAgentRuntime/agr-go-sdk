@@ -7,8 +7,8 @@ product-level entry point for credentials, regions, transport policy, and
 first-class resources. The current release provides managed `Sandbox`
 lifecycles and data-plane operations, stable Deployment control and managed
 HTTP/SSE/WebSocket connections, Tool management, and image pre-cache tasks.
-Preview prereleases additionally expose Volume and VolumeTemplate management and persistent Tool
-mounts.
+Preview prereleases additionally expose Volume and VolumeTemplate management, persistent Tool
+mounts, and SessionSpace/Session/Event control APIs.
 
 This is a new Go module, not an in-place release of `ags-go-sdk`. Existing
 users should read [Migrating from ags-go-sdk](MIGRATING_FROM_AGS_GO_SDK.md).
@@ -162,6 +162,12 @@ including `${metadata.session_id}`, are sent unchanged. Deleting a Sandbox or To
 implicitly delete a standalone Volume; a retained template-derived Volume also requires explicit
 cleanup. See the [persistent Volume cookbook](examples/cookbook/09_persistent_volume/main.go).
 
+Preview releases also provide `client.SessionSpaces()` and `client.Sessions()`. Every Session is
+identified by `SessionRef{SpaceID, UserID, SessionID}`; the SDK never fills an implicit Space or
+User. JSON state, deltas, event metadata, extensions, and function payloads are validated as
+bounded JSON objects. Event append mutations are not retried. See the
+[Session and Events cookbook](examples/cookbook/10_session_events/main.go).
+
 ## Capabilities
 
 | Area | API |
@@ -178,6 +184,8 @@ cleanup. See the [persistent Volume cookbook](examples/cookbook/09_persistent_vo
 | Deployment data plane | direct managed HTTP/SSE `Do`, context-aware WebSocket, token refresh, affinity |
 | Preview Volume | `Create`, exact `Get`, offset `List`, `Update`, `Delete` |
 | Preview VolumeTemplate | `Create`, exact `Get`, offset `List`, `Update`, `Delete`, Tool reuse-key mounts |
+| Preview SessionSpace | `Create`, exact `Get`, offset `List`, `Update`, `Delete` |
+| Preview Session and Events | Session `Create`, exact `Get`, offset `List`, `Update`, `Delete`; Event `AppendEvent`, `ListEvents` |
 
 ## Lifecycle rules
 
@@ -231,9 +239,9 @@ referenced object closure.
 
 Preview capabilities, when present, use explicit semantic-version prereleases such as
 `v0.3.0-preview.1`. The module path and public resource names remain unchanged. The SDK has no
-runtime preview switch, environment toggle, request-level channel, or Go build tag. The current
-capability table above is stable; a preview version is published only after its contract, public
-API, tests, and real-service evidence are reviewed.
+runtime preview switch, environment toggle, request-level channel, or Go build tag. Rows labeled
+Preview are present only in preview prereleases; all other rows are stable. A preview version is
+published only after its contract, public API, tests, and real-service evidence are reviewed.
 
 See the [Architecture](ARCHITECTURE.md), [Cookbook](examples/cookbook/README.md),
 [Security Policy](SECURITY.md), and [Contributing Guide](CONTRIBUTING.md).

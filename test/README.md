@@ -101,6 +101,19 @@ that Stop triggers the service's delete-on-Sandbox-deletion behavior.
 Missing or ambiguous fixture variables fail before any network request instead of selecting an
 existing resource from List.
 
+The Preview Session journey always runs in `ap-shanghai` and needs no Tool or storage fixture.
+Its minimal environment is `AGS_E2E=1` and the two Tencent Cloud secret variables:
+
+```bash
+cd test
+AGS_E2E=1 go test -v -count=1 -run '^TestSessionCloudJourney$' .
+```
+
+It creates two uniquely named non-default SessionSpaces and the same Session ID under different
+Space/User identities. It verifies CustomState, StateDelta, structured Event content,
+Author/AfterTimestamp filtering, pagination, updates, isolation, and consistent EventCount. It
+deletes only those Sessions, then their SessionSpaces, and confirms each resource is NotFound.
+
 The explicit-client journey covers Files, streamed upload/read, Watch, Commands Run/List/Connect,
 PTY, all ten Metrics with an explicit Start/End window, Update, and Connect. A dedicated
 code-interpreter journey covers Code, managed/external contexts, Pause/Resume, and generation

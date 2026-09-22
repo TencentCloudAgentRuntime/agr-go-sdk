@@ -29,6 +29,9 @@ source-incompatible changes.
 - Preview `Volume` and `VolumeTemplate` managers with create/get/list/update/delete operations,
   plus Tool mounts by Volume ID/name or VolumeTemplate reuse key and a persistent-storage
   cookbook journey.
+- Preview `SessionSpace` and `Session` managers covering 12 reviewed Actions, bounded structured
+  state and Events, explicit three-part Session identity, a cookbook journey, and Shanghai Cloud
+  E2E coverage.
 
 ### Changed
 
@@ -42,9 +45,9 @@ source-incompatible changes.
 - The control-plane manifest records stable/preview source channel, resource ownership,
   maturity, transport route, request/response types, and per-Action object closures.
 - Tencent Cloud AGS and common modules are updated to 1.3.179.
-- The stable control-plane allowlist remains 19 typed Actions. Preview adds eight reviewed
-  Volume and VolumeTemplate Actions through an internal `CommonClient` allowlist; there is no
-  public raw call or typed-to-raw fallback.
+- The stable control-plane allowlist remains 19 typed Actions. Preview adds 20 reviewed Volume,
+  VolumeTemplate, SessionSpace, Session, and Event Actions through an internal `CommonClient`
+  allowlist; there is no public raw call or typed-to-raw fallback.
 
 ### Removed
 

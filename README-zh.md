@@ -5,7 +5,8 @@
 这是腾讯云 Agent Runtime（AGR）的原生 Go SDK。`Client` 是凭证、地域、传输策略和
 一级资源的产品入口。当前版本提供受管理的 `Sandbox` 生命周期和数据面操作、Deployment
 控制面与 HTTP/SSE/WebSocket 连接、稳定的 Tool 管理能力，以及镜像预热任务。
-Preview 预发布版本还提供 Volume、VolumeTemplate 管理和 Tool 持久卷挂载。
+Preview 预发布版本还提供 Volume、VolumeTemplate、SessionSpace、Session 和 Event 控制接口，
+并支持 Tool 持久卷挂载。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
 [从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
@@ -154,6 +155,12 @@ Preview 版本提供 `client.Volumes()` 和 `client.VolumeTemplates()`。一个 
 Volume 也需要显式清理。完整流程见
 [持久卷 Cookbook](examples/cookbook/09_persistent_volume/main.go)。
 
+Preview 版本还提供 `client.SessionSpaces()` 和 `client.Sessions()`。调用方必须使用
+`SessionRef{SpaceID, UserID, SessionID}` 标识 Session，SDK 不补全默认 Space 或 User。
+CustomState、StateDelta、事件 Metadata、Extensions 和函数载荷必须是有界 JSON 对象。
+SDK 不重试 AppendEvent。完整流程见
+[Session 与 Event Cookbook](examples/cookbook/10_session_events/main.go)。
+
 ## 能力
 
 | 范围 | API |
@@ -170,6 +177,8 @@ Volume 也需要显式清理。完整流程见
 | Deployment 数据面 | 直连受管 HTTP/SSE `Do`、支持 context 的 WebSocket、Token 刷新、affinity |
 | Preview Volume | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete` |
 | Preview VolumeTemplate | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`、Tool reuse-key 挂载 |
+| Preview SessionSpace | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete` |
+| Preview Session 与 Event | Session `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`；Event `AppendEvent`、`ListEvents` |
 
 ## 生命周期规则
 
@@ -213,8 +222,8 @@ v2 控制面 manifest 固定 CLI revision 和来源 channel，记录有效契约
 
 存在 Preview 能力时，通过 `v0.3.0-preview.1` 一类语义化预发布版本交付。module path 和
 公共资源名称保持不变。SDK 不提供运行时 Preview 开关、环境变量切换、请求级 Channel 或
-Go build tag。上方能力表当前均为 stable；Preview 版本只有在契约、公共 API、测试和真实
-服务证据通过评审后才会发布。
+Go build tag。上方标注 Preview 的能力只在 Preview 预发布版本中提供，其余能力为 stable。
+Preview 版本只有在契约、公共 API、测试和真实服务证据通过评审后才会发布。
 
 实现边界见 [架构说明](ARCHITECTURE-zh.md)，更多示例见
 [Cookbook](examples/cookbook/README.md)。安全问题请按 [安全策略](SECURITY.md) 报告。

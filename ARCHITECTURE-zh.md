@@ -17,13 +17,22 @@ Client
   |                      `-- Metrics
   |-- ToolManager -> ToolInfo / ToolMutationResult
   |-- PreCacheImageManager -> PreCacheImageInfo
-  `-- DeploymentManager -> DeploymentInfo
-                          `-> DeploymentConnection -> HTTP / SSE / WebSocket
+  |-- DeploymentManager -> DeploymentInfo
+  |                       `-> DeploymentConnection -> HTTP / SSE / WebSocket
+  |-- VolumeManager -> VolumeInfo
+  |-- VolumeTemplateManager -> VolumeTemplateInfo
+  |-- SessionSpaceManager -> SessionSpaceInfo
+  `-- SessionManager -> SessionInfo / EventInfo
 ```
 
 一个 `Client` 绑定一套腾讯云身份、地域、Endpoint 和请求策略。Create 和 Connect 都返回
 唯一的 `*agr.Sandbox`。`sandbox` 包只是基于环境变量的 Client 快捷入口，不包含另一套
 Sandbox 实现。
+
+Preview SessionSpace 和 Session manager 是账号级纯控制面服务。Session 由 Space、User 和
+Session 三部分共同标识，SDK 不补全默认值。状态与 Event 中的 JSON 由 SDK 校验大小和对象
+结构。Session 不属于 Sandbox generation、CodeContext 或 Deployment affinity，也没有本地
+`Close`；远端清理顺序是先删除 Session，再删除 SessionSpace。
 
 Tool 和预热 manager 是账号级纯控制面服务。它们返回的描述、mutation 回执和任务状态是
 SDK 自有的不可变值，不是已连接 handle：没有本地 generation，也不需要 `Close`。mutation
@@ -55,6 +64,8 @@ agr / sandbox（公共 facade）
 - 根包负责公共选项、参数校验、稳定错误，以及公共模型和内部 DTO 的转换。
 - `internal/controlplane` 负责 Cloud Client、签名集成、typed Action 映射、生命周期轮询、
   Metrics 请求、实例 Token 获取和新 runtime generation 的构造。
+- Preview Volume 和 Session Action 仅通过内部白名单调用腾讯云官方 `common.CommonClient`。
+  typed Action 失败后不会回退到 raw 路由，公共 API 也不暴露通用 RawCall。
 - `internal/runtime` 负责 generation 有效性、请求生命周期、handle、stream pump、有界队列、
   输出聚合和本地失效。
 - `internal/dataplane` 负责不可变 Endpoint 和实例访问材料、鉴权 Header、HTTP/Connect 调用、

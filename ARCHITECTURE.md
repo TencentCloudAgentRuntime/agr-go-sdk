@@ -21,7 +21,9 @@ Client
   |-- DeploymentManager -> DeploymentInfo
   |                       `-> DeploymentConnection -> HTTP / SSE / WebSocket
   |-- VolumeManager -> VolumeInfo
-  `-- VolumeTemplateManager -> VolumeTemplateInfo
+  |-- VolumeTemplateManager -> VolumeTemplateInfo
+  |-- SessionSpaceManager -> SessionSpaceInfo
+  `-- SessionManager -> SessionInfo / EventInfo
 ```
 
 `Client` binds one Tencent Cloud identity, region, endpoints, and request policy.
@@ -39,6 +41,12 @@ They return immutable SDK-owned values. A Tool mount selects exactly one of a di
 source, an existing Volume reference, or a VolumeTemplate reference. Deleting a Sandbox or Tool
 does not imply deletion of standalone storage; template reclaim policy is server-owned and callers
 still explicitly clean retained derived Volumes.
+
+Preview SessionSpace and Session managers are account-level, control-plane-only services. A
+Session has an explicit Space, User, and Session identity; no component is inferred globally.
+State and Event JSON are SDK-owned bounded values. Sessions have no Sandbox generation,
+CodeContext lifetime, Deployment affinity, or local `Close` operation. Remote cleanup is always
+explicit and ordered Session before SessionSpace.
 
 Deployment control operations also return immutable snapshots. `DeploymentConnection` is the
 only stateful Deployment object: it binds one Deployment, region, domain, and Tool port. It owns
@@ -70,7 +78,7 @@ agr / sandbox (public facades)
 - `internal/controlplane` owns Cloud clients, signing integration, typed Action mapping,
   lifecycle polling, Metrics requests, instance-token acquisition, and construction
   of a fresh runtime generation.
-- Preview Volume Actions use the official Tencent Cloud `common.CommonClient` only through a
+- Preview Volume and Session Actions use the official Tencent Cloud `common.CommonClient` only through a
   compile-time internal allowlist because the pinned generated AGS models do not contain them.
   Existing typed Actions never fall back to this path after failure, and no raw call is public.
 - `internal/runtime` owns generation validity, request lifetimes, handles, stream
