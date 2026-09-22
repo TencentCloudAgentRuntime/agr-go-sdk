@@ -217,7 +217,7 @@ type ToolCOSStorage struct {
 	Endpoint string
 	// BucketName is the COS bucket name.
 	BucketName string
-	// BucketPath is the path inside the bucket.
+	// BucketPath is an absolute path inside the bucket and must start with "/".
 	BucketPath string
 }
 
@@ -723,9 +723,15 @@ func validateToolMounts(values []ToolStorageMount, operation string) error {
 			count := 0
 			if mount.Source.COS != nil {
 				count++
+				if mount.Source.COS.Endpoint == "" || mount.Source.COS.BucketName == "" || !strings.HasPrefix(mount.Source.COS.BucketPath, "/") {
+					return codeError(InvalidArgument, operation, "COS_STORAGE_SOURCE_INVALID")
+				}
 			}
 			if mount.Source.CFS != nil {
 				count++
+				if mount.Source.CFS.FileSystemID == "" || mount.Source.CFS.Path == "" {
+					return codeError(InvalidArgument, operation, "CFS_STORAGE_SOURCE_INVALID")
+				}
 			}
 			if mount.Source.Image != nil {
 				count++

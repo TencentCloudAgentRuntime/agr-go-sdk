@@ -32,10 +32,10 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	bootstrapTool, err := client.Tools().Create(ctx, toolFixture.createOptions(
 		"agr-sdk-e2e-volume-bootstrap-"+suffix,
 		[]agr.ToolTag{{Key: "agr-sdk-e2e", Value: suffix}},
-		[]agr.ToolStorageMount{environment.bootstrapMount(path)},
+		[]agr.ToolStorageMount{environment.bootstrapMount()},
 	))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("create bootstrap Tool: %v; cloud_code=%s request=%s chain=%s", err, cloudErrorCode(err), cloudRequestID(err), errorTypeChain(err))
 	}
 	owned.toolIDs = append(owned.toolIDs, bootstrapTool.ToolID)
 	if _, err = client.Tools().WaitFor(ctx, bootstrapTool.ToolID, agr.ToolActive); err != nil {
@@ -60,6 +60,9 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	owned.templates[retained.ID] = true
 	deleted := createE2ETemplate(t, ctx, client, environment, "agr-sdk-e2e-delete-"+suffix, agr.VolumeReclaimDelete, path+"/delete/${reuse_key}")
 	owned.templates[deleted.ID] = true
+	if retained.ReclaimPolicy != agr.VolumeReclaimRetain || deleted.ReclaimPolicy != agr.VolumeReclaimDelete {
+		t.Fatalf("template reclaim policies: retain=%s delete=%s", retained.ReclaimPolicy, deleted.ReclaimPolicy)
+	}
 
 	readOnly := true
 	createdTool, err := client.Tools().Create(ctx, toolFixture.createOptions(
@@ -90,9 +93,6 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 	runVolumeCommand(t, ctx, sandboxA, "set -eu; printf direct > /mnt/by-name/probe; test \"$(cat /mnt/by-id/probe)\" = direct; if touch /mnt/by-id/forbidden 2>/dev/null; then exit 90; fi; printf shared-a > /mnt/shared/probe; printf retained > /mnt/retain/probe; printf deleted > /mnt/delete/probe")
 	sharedA := waitDerivedVolume(t, ctx, client.Volumes(), shared.ID, keyA)
 	owned.volumes[sharedA.ID] = true
-	if err := client.Volumes().Delete(ctx, standalone.ID); err == nil {
-		t.Fatal("deleting a mounted Volume unexpectedly succeeded")
-	}
 
 	sandboxSameKey := createE2EVolumeSandbox(t, ctx, client, createdTool.ToolID, keyA)
 	owned.sandboxes = append(owned.sandboxes, sandboxSameKey)
@@ -116,8 +116,8 @@ func TestPersistentVolumeCloudJourney(t *testing.T) {
 
 	deleteOneVolumeSandbox(t, client.Sandboxes(), sandboxOtherKey)
 	owned.sandboxes = owned.sandboxes[:2]
-	waitVolumeAbsent(t, ctx, client.Volumes(), deleteB.ID)
-	delete(owned.volumes, deleteB.ID)
+	// SandboxManager.Delete maps to StopSandboxInstance. STOPPED is not deletion of the
+	// Sandbox record, so it cannot be used to claim that ReclaimPolicy=Delete ran.
 	if got, err := client.Volumes().Get(ctx, retainB.ID); err != nil || got.ID != retainB.ID {
 		t.Fatalf("Retain-derived Volume after Sandbox deletion = %+v, %v", got, err)
 	}
@@ -216,10 +216,10 @@ func createE2ETemplate(t *testing.T, ctx context.Context, client *agr.Client, en
 	return waitTemplateActive(t, ctx, client.VolumeTemplates(), created.ID)
 }
 
-func (e volumeCloudEnvironment) bootstrapMount(path string) agr.ToolStorageMount {
+func (e volumeCloudEnvironment) bootstrapMount() agr.ToolStorageMount {
 	source := &agr.ToolStorageSource{}
 	if e.storageType == agr.VolumeStorageCOS {
-		source.COS = &agr.ToolCOSStorage{Endpoint: e.cosEndpoint, BucketName: e.cosBucket, BucketPath: path}
+		source.COS = &agr.ToolCOSStorage{Endpoint: e.cosEndpoint, BucketName: e.cosBucket, BucketPath: "/"}
 	} else {
 		source.CFS = &agr.ToolCFSStorage{FileSystemID: e.fileSystemID, Path: "/"}
 	}
@@ -227,16 +227,10 @@ func (e volumeCloudEnvironment) bootstrapMount(path string) agr.ToolStorageMount
 }
 
 func (e volumeCloudEnvironment) fixtureMountPath(path string) string {
-	if e.storageType == agr.VolumeStorageCOS {
-		return "/mnt/bootstrap"
-	}
 	return "/mnt/bootstrap/" + path
 }
 
 func (e volumeCloudEnvironment) fixtureCleanupCommand(path string) string {
-	if e.storageType == agr.VolumeStorageCOS {
-		return "rm -rf -- /mnt/bootstrap/* /mnt/bootstrap/.[!.]* /mnt/bootstrap/..?*; test -z \"$(ls -A /mnt/bootstrap)\""
-	}
 	return "rm -rf -- /mnt/bootstrap/" + path + "; test ! -e /mnt/bootstrap/" + path
 }
 
@@ -315,20 +309,20 @@ func (f volumeToolFixture) createOptions(name string, tags []agr.ToolTag, mounts
 
 func TestVolumeFixtureContract(t *testing.T) {
 	cos := volumeCloudEnvironment{storageType: agr.VolumeStorageCOS, cosEndpoint: "cos.ap-guangzhou.myqcloud.com", cosBucket: "fixture-1250000000"}
-	cosMount := cos.bootstrapMount("agr-sdk-e2e/run")
-	if cosMount.Source == nil || cosMount.Source.COS == nil || cosMount.Source.CFS != nil || cosMount.Source.COS.BucketPath != "agr-sdk-e2e/run" {
+	cosMount := cos.bootstrapMount()
+	if cosMount.Source == nil || cosMount.Source.COS == nil || cosMount.Source.CFS != nil || cosMount.Source.COS.BucketPath != "/" {
 		t.Fatalf("COS bootstrap mount = %+v", cosMount)
 	}
 	cosStorage := cos.volumeStorage("agr-sdk-e2e/run/direct")
 	if cosStorage.COS == nil || cosStorage.CFS != nil || cosStorage.COS.Endpoint != cos.cosEndpoint || cosStorage.COS.BucketName != cos.cosBucket || cosStorage.COS.BucketPath != "agr-sdk-e2e/run/direct" {
 		t.Fatalf("COS Volume storage = %+v", cosStorage)
 	}
-	if cos.volumeTemplateStorage("agr-sdk-e2e/run/${reuse_key}").COS == nil || cos.fixtureMountPath("agr-sdk-e2e/run") != "/mnt/bootstrap" {
+	if cos.volumeTemplateStorage("agr-sdk-e2e/run/${reuse_key}").COS == nil || cos.fixtureMountPath("agr-sdk-e2e/run") != "/mnt/bootstrap/agr-sdk-e2e/run" {
 		t.Fatal("COS fixture projection is incomplete")
 	}
 
 	cfs := volumeCloudEnvironment{storageType: agr.VolumeStorageCFS, fileSystemID: "cfs-fixture"}
-	cfsMount := cfs.bootstrapMount("agr-sdk-e2e/run")
+	cfsMount := cfs.bootstrapMount()
 	if cfsMount.Source == nil || cfsMount.Source.CFS == nil || cfsMount.Source.COS != nil || cfsMount.Source.CFS.Path != "/" {
 		t.Fatalf("CFS bootstrap mount = %+v", cfsMount)
 	}

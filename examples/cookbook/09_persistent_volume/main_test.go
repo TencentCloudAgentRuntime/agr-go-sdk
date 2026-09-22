@@ -42,8 +42,8 @@ func TestVolumeFixtureBuildsCOSAndCFSContracts(t *testing.T) {
 		if fixture.storageType != agr.VolumeStorageCOS {
 			t.Fatalf("storage type = %q", fixture.storageType)
 		}
-		mount := fixture.bootstrapMount("agr-sdk-e2e/run")
-		if mount.Source == nil || mount.Source.COS == nil || mount.Source.CFS != nil || mount.Source.COS.BucketPath != "agr-sdk-e2e/run" {
+		mount := fixture.bootstrapMount()
+		if mount.Source == nil || mount.Source.COS == nil || mount.Source.CFS != nil || mount.Source.COS.BucketPath != "/" {
 			t.Fatalf("COS bootstrap mount = %+v", mount)
 		}
 		storage := fixture.volumeStorage("agr-sdk-e2e/run/direct")
@@ -66,7 +66,7 @@ func TestVolumeFixtureBuildsCOSAndCFSContracts(t *testing.T) {
 		if fixture.storageType != agr.VolumeStorageCFS {
 			t.Fatalf("storage type = %q", fixture.storageType)
 		}
-		mount := fixture.bootstrapMount("agr-sdk-e2e/run")
+		mount := fixture.bootstrapMount()
 		if mount.Source == nil || mount.Source.CFS == nil || mount.Source.COS != nil || mount.Source.CFS.Path != "/" {
 			t.Fatalf("CFS bootstrap mount = %+v", mount)
 		}

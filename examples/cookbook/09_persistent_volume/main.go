@@ -37,7 +37,7 @@ func run() error {
 	basePath := "agr-sdk-cookbook/" + suffix
 	bootstrapTool, err := client.Tools().Create(ctx, toolFixture.createOptions(
 		"agr-sdk-volume-bootstrap-"+suffix,
-		[]agr.ToolStorageMount{fixture.bootstrapMount(basePath)},
+		[]agr.ToolStorageMount{fixture.bootstrapMount()},
 	))
 	if err != nil {
 		return err
@@ -228,10 +228,10 @@ func volumeFixtureFromEnv() (volumeFixture, error) {
 	return fixture, nil
 }
 
-func (f volumeFixture) bootstrapMount(path string) agr.ToolStorageMount {
+func (f volumeFixture) bootstrapMount() agr.ToolStorageMount {
 	source := &agr.ToolStorageSource{}
 	if f.storageType == agr.VolumeStorageCOS {
-		source.COS = &agr.ToolCOSStorage{Endpoint: f.cosEndpoint, BucketName: f.cosBucket, BucketPath: path}
+		source.COS = &agr.ToolCOSStorage{Endpoint: f.cosEndpoint, BucketName: f.cosBucket, BucketPath: "/"}
 	} else {
 		source.CFS = &agr.ToolCFSStorage{FileSystemID: f.fileSystemID, Path: "/"}
 	}
@@ -239,16 +239,10 @@ func (f volumeFixture) bootstrapMount(path string) agr.ToolStorageMount {
 }
 
 func (f volumeFixture) mountPath(path string) string {
-	if f.storageType == agr.VolumeStorageCOS {
-		return "/mnt/bootstrap"
-	}
 	return "/mnt/bootstrap/" + path
 }
 
 func (f volumeFixture) cleanupCommand(path string) string {
-	if f.storageType == agr.VolumeStorageCOS {
-		return "rm -rf -- /mnt/bootstrap/* /mnt/bootstrap/.[!.]* /mnt/bootstrap/..?*; test -z \"$(ls -A /mnt/bootstrap)\""
-	}
 	return "rm -rf -- /mnt/bootstrap/" + path + "; test ! -e /mnt/bootstrap/" + path
 }
 

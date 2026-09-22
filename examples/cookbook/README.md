@@ -40,4 +40,5 @@ deleting the original Tool. Role ARN variables may override the copied role. The
 temporary bootstrap Tool/Sandbox creates and later removes only the example's unique COS prefix
 or CFS subpath. It never deletes the Bucket or CFS file system. Cleanup runs in dependency order:
 workload Sandbox, Tool, retained derived Volumes, VolumeTemplate, standalone Volume, fixture
-data, bootstrap Sandbox, then bootstrap Tool.
+data, bootstrap Sandbox, then bootstrap Tool. For COS, use the Bucket-qualified endpoint
+`<bucket-appid>.cos.<region>.myqcloud.com`; the region-wide COS endpoint is not a Bucket identity.

@@ -375,6 +375,8 @@ func TestToolPreviewVolumeMountValidationAndCopy(t *testing.T) {
 	base := CreateToolOptions{Name: "invalid-volume", Type: ToolCustom, Network: ToolNetworkConfiguration{Mode: ToolNetworkSandbox}}
 	invalid := [][]ToolStorageMount{
 		{{Name: "conflict", Source: &ToolStorageSource{CFS: &ToolCFSStorage{FileSystemID: "cfs", Path: "/"}}, Volume: &ToolVolumeRef{ID: "vol"}}},
+		{{Name: "relative-cos-path", Source: &ToolStorageSource{COS: &ToolCOSStorage{Endpoint: "bucket.cos.ap-test.myqcloud.com", BucketName: "bucket-1000000000", BucketPath: "relative"}}}},
+		{{Name: "incomplete-cfs", Source: &ToolStorageSource{CFS: &ToolCFSStorage{FileSystemID: "cfs"}}}},
 		{{Name: "both-identities", Volume: &ToolVolumeRef{ID: "vol", Name: "volume"}}},
 		{{Name: "missing-identity", Volume: &ToolVolumeRef{}}},
 		{{Name: "missing-template-name", VolumeTemplate: &ToolVolumeTemplateRef{ReuseKey: "key"}}},

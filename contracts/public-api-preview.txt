@@ -1823,7 +1823,7 @@ type ToolCOSStorage struct {
 	Endpoint string
 	// BucketName is the COS bucket name.
 	BucketName string
-	// BucketPath is the path inside the bucket.
+	// BucketPath is an absolute path inside the bucket and must start with "/".
 	BucketPath string
 }
     ToolCOSStorage configures a COS-backed mount.

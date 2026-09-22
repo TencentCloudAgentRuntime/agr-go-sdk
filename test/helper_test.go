@@ -35,6 +35,14 @@ func cloudErrorCode(err error) string {
 	return ""
 }
 
+func cloudRequestID(err error) string {
+	var failure *agr.Error
+	if errors.As(err, &failure) {
+		return failure.RequestID
+	}
+	return ""
+}
+
 type a1CloudEnvironment struct {
 	cloudEnvironment
 	preCacheImage        string

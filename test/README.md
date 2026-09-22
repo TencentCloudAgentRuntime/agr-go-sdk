@@ -68,7 +68,7 @@ The Preview persistent-Volume journey always runs in `ap-guangzhou`; it does not
 
 ```bash
 # COS option
-export AGR_VOLUME_COS_ENDPOINT=cos.ap-guangzhou.myqcloud.com
+export AGR_VOLUME_COS_ENDPOINT=<bucket-appid>.cos.ap-guangzhou.myqcloud.com
 export AGR_VOLUME_COS_BUCKET=...         # reviewed Bucket; never deleted by the test
 
 # CFS option instead of COS
@@ -94,6 +94,10 @@ VolumeTemplates; it never deletes the Bucket or CFS file system and never reuses
 account resource. A base Tool is queried by exact ID only; its runtime configuration is copied to
 the two test-owned Tools, while the base Tool itself remains unchanged. The fixture and base Tool
 must belong to `ap-guangzhou`; cross-region resources are invalid.
+The COS endpoint must identify the reviewed Bucket, not the region-wide
+`cos.ap-guangzhou.myqcloud.com` endpoint. `SandboxManager.Delete` stops an instance and leaves a
+`STOPPED` record; the journey therefore verifies both reclaim-policy values but does not claim
+that Stop triggers the service's delete-on-Sandbox-deletion behavior.
 Missing or ambiguous fixture variables fail before any network request instead of selecting an
 existing resource from List.
 
