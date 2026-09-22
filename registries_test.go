@@ -262,14 +262,22 @@ func TestRegistryUnknownEnumsArePreserved(t *testing.T) {
 func TestRegistryJSONLimitAndURLValidation(t *testing.T) {
 	control := &registryTestControl{}
 	records := newRegistryTestClient(t, control).Registries().Records("reg")
-	tooLarge := json.RawMessage(`{"x":"` + strings.Repeat("a", maxRegistryJSONBytes) + `"}`)
+	const objectOverhead = len(`{"x":""}`)
+	atLimit := json.RawMessage(`{"x":"` + strings.Repeat("a", maxRegistryJSONBytes-objectOverhead) + `"}`)
+	if len(atLimit) != maxRegistryJSONBytes {
+		t.Fatalf("boundary fixture=%d", len(atLimit))
+	}
+	if _, err := records.Create(context.Background(), CreateRegistryRecordOptions{Name: "custom", DescriptorType: RegistryDescriptorCustom, CustomDescriptors: atLimit}); err != nil {
+		t.Fatalf("1 MiB JSON rejected: %v", err)
+	}
+	tooLarge := json.RawMessage(`{"x":"` + strings.Repeat("a", maxRegistryJSONBytes-objectOverhead+1) + `"}`)
 	if _, err := records.Create(context.Background(), CreateRegistryRecordOptions{Name: "custom", DescriptorType: RegistryDescriptorCustom, CustomDescriptors: tooLarge}); err == nil {
 		t.Fatal("oversized JSON accepted")
 	}
 	if _, err := records.Create(context.Background(), CreateRegistryRecordOptions{Name: "mcp", DescriptorType: RegistryDescriptorMCP, MCPSource: &RegistryMCPSource{Type: RegistrySourceURLImport, EndpointURL: "http://example.invalid"}}); err == nil {
 		t.Fatal("non-HTTPS import accepted")
 	}
-	if control.calls != 0 {
+	if control.calls != 1 {
 		t.Fatalf("invalid source reached transport: %d", control.calls)
 	}
 }
