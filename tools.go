@@ -903,7 +903,9 @@ const (
 	VolumeReadOnlyMany VolumeAccessMode = "ReadOnlyMany"
 )
 
-// VolumeStorageType selects the backing storage contract.
+// VolumeStorageType selects the backing storage contract. Create accepts only
+// the constants below. List preserves unknown service values without exposing
+// an unreviewed backing-storage shape.
 type VolumeStorageType string
 
 const (
@@ -1047,7 +1049,8 @@ type VolumeInfo struct {
 	State VolumeState
 	// StorageType identifies the backing storage kind.
 	StorageType VolumeStorageType
-	// Storage contains the backing location and is redacted when formatted.
+	// Storage contains a reviewed backing location and is redacted when formatted.
+	// It is empty when StorageType is not modeled by this SDK version.
 	Storage VolumeStorage
 	// TemplateID identifies the source template for a derived Volume.
 	TemplateID string
@@ -1388,7 +1391,8 @@ type VolumeTemplateInfo struct {
 	State VolumeState
 	// StorageType identifies the backing storage kind.
 	StorageType VolumeStorageType
-	// Storage contains the backing pattern and is redacted when formatted.
+	// Storage contains a reviewed backing pattern and is redacted when formatted.
+	// It is empty when StorageType is not modeled by this SDK version.
 	Storage VolumeTemplateStorage
 	// VolumeNamePattern is applied to derived Volumes.
 	VolumeNamePattern string

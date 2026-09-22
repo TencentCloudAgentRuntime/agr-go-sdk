@@ -134,6 +134,30 @@ func TestVolumeGetRequiresExactSingleMatch(t *testing.T) {
 	}
 }
 
+func TestVolumeListPreservesUnknownStorageTypeWithoutPublishingDetails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"Response": map[string]any{
+			"VolumeSet": []any{map[string]any{
+				"VolumeId": "vol-opaque", "VolumeName": "opaque", "AccessMode": "ReadWriteOnce", "ReclaimPolicy": "Retain", "Status": "ACTIVE", "StorageType": "AgentCbs",
+				"Storage": map[string]any{"AgentCbs": map[string]any{"DiskId": "must-not-escape"}},
+			}},
+			"TotalCount": 1, "RequestId": "r",
+		}})
+	}))
+	defer server.Close()
+	client, _ := NewClient(WithRegion("ap-test"), WithCredential(CloudCredential{"id", "key"}), WithControlPlaneEndpoint(server.URL), WithHTTPClient(server.Client()))
+	page, err := client.Volumes().List(context.Background(), VolumeListOptions{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].StorageType != VolumeStorageType("AgentCbs") || page.Items[0].Storage.COS != nil || page.Items[0].Storage.CFS != nil {
+		t.Fatalf("opaque Volume = %+v", page.Items)
+	}
+	if strings.Contains(page.Items[0].String(), "must-not-escape") {
+		t.Fatal("opaque backing details escaped through the public model")
+	}
+}
+
 func TestVolumeTemplateGetRequiresExactSingleMatch(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

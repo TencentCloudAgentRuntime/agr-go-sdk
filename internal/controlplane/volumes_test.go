@@ -81,6 +81,32 @@ func TestCommonVolumeTemplateRejectsMalformedCollectionAndStorage(t *testing.T) 
 	}
 }
 
+func TestCommonVolumeListKeepsUnknownStorageOpaque(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"Response": map[string]any{
+			"VolumeSet": []any{map[string]any{
+				"VolumeId": "vol-opaque", "VolumeName": "opaque", "AccessMode": "ReadWriteOnce", "ReclaimPolicy": "Retain", "Status": "ACTIVE", "StorageType": "AgentCbs",
+				"Storage": map[string]any{"AgentCbs": map[string]any{"DiskId": "must-not-escape"}},
+			}},
+			"TotalCount": 1, "RequestId": "r",
+		}})
+	}))
+	defer server.Close()
+	api := NewAGS(Config{Region: "ap-test", Endpoint: server.URL, Timeout: time.Second, Transport: server.Client().Transport}, func(context.Context) (Credential, error) {
+		return Credential{SecretID: "id", SecretKey: "key"}, nil
+	})
+	page, err := api.ListVolumes(context.Background(), VolumeListRequest{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].StorageType != "AgentCbs" || page.Items[0].Storage.COS != nil || page.Items[0].Storage.CFS != nil {
+		t.Fatalf("opaque Volume = %+v", page.Items)
+	}
+	if value, err := volumeStorageSpecFromWire("FutureBackend", volumeStorageSpecWire{}); err != nil || value.COS != nil || value.CFS != nil {
+		t.Fatalf("opaque VolumeTemplate storage = %+v, %v", value, err)
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }

@@ -484,6 +484,12 @@ func volumeStorageSpecToWire(value VolumeStorageSpec) volumeStorageSpecWire {
 }
 
 func volumeStorageFromWire(storageType string, value volumeStorageWire) (VolumeStorage, error) {
+	if storageType != "Cos" && storageType != "Cfs" {
+		// The account-wide List API can contain storage backends that this
+		// Preview SDK deliberately does not model. Preserve StorageType on the
+		// resource while keeping those backend details private and opaque.
+		return VolumeStorage{}, nil
+	}
 	count := 0
 	out := VolumeStorage{}
 	if value.COS != nil {
@@ -507,6 +513,9 @@ func volumeStorageFromWire(storageType string, value volumeStorageWire) (VolumeS
 }
 
 func volumeStorageSpecFromWire(storageType string, value volumeStorageSpecWire) (VolumeStorageSpec, error) {
+	if storageType != "Cos" && storageType != "Cfs" {
+		return VolumeStorageSpec{}, nil
+	}
 	count := 0
 	out := VolumeStorageSpec{}
 	if value.COS != nil {
