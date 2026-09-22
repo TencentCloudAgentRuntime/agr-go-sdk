@@ -226,7 +226,11 @@ func (a *AGS) CreateToolPreview(ctx context.Context, in CreateToolRequest) (Tool
 			mount["Volume"] = ref
 		}
 		if value.VolumeTemplate != nil {
-			mount["VolumeTemplate"] = map[string]any{"VolumeTemplateName": value.VolumeTemplate.Name, "ReuseKey": value.VolumeTemplate.ReuseKey}
+			ref := map[string]any{"VolumeTemplateName": value.VolumeTemplate.Name}
+			if value.VolumeTemplate.ReuseKey != "" {
+				ref["ReuseKey"] = value.VolumeTemplate.ReuseKey
+			}
+			mount["VolumeTemplate"] = ref
 		}
 	}
 	var response struct {

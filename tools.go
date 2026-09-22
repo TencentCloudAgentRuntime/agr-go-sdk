@@ -263,7 +263,7 @@ type ToolStorageSource struct {
 	AgentBucket *ToolAgentBucketStorage
 }
 
-// ToolVolumeRef selects one existing Preview Volume by exactly one identity.
+// ToolVolumeRef selects one existing Preview Volume by ID, name, or both.
 type ToolVolumeRef struct {
 	// ID is the stable Volume identity.
 	ID string
@@ -744,7 +744,7 @@ func validateToolMounts(values []ToolStorageMount, operation string) error {
 			}
 		}
 		if mount.Volume != nil {
-			if (mount.Volume.ID == "") == (mount.Volume.Name == "") {
+			if mount.Volume.ID == "" && mount.Volume.Name == "" {
 				return codeError(InvalidArgument, operation, "VOLUME_REF_INVALID")
 			}
 		}

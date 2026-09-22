@@ -363,8 +363,8 @@ func TestToolPreviewVolumeMountRequestAndResponseMapping(t *testing.T) {
 	created, err := client.Tools().Create(context.Background(), CreateToolOptions{
 		Name: "volume-tool", Type: ToolCustom, Network: ToolNetworkConfiguration{Mode: ToolNetworkSandbox},
 		StorageMounts: []ToolStorageMount{
-			{Name: "existing", MountPath: "/mnt/existing", Volume: &ToolVolumeRef{ID: "vol-existing"}},
-			{Name: "session", MountPath: "/mnt/session", ReadOnly: &readOnly, VolumeTemplate: &ToolVolumeTemplateRef{Name: "session-template", ReuseKey: "${metadata.session_id}"}},
+			{Name: "existing", MountPath: "/mnt/existing", Volume: &ToolVolumeRef{ID: "vol-existing", Name: "named-volume"}},
+			{Name: "session", MountPath: "/mnt/session", ReadOnly: &readOnly, VolumeTemplate: &ToolVolumeTemplateRef{Name: "session-template"}},
 		},
 	})
 	if err != nil || created.ToolID != "sdt-volume" {
@@ -376,12 +376,12 @@ func TestToolPreviewVolumeMountRequestAndResponseMapping(t *testing.T) {
 	}
 	first := mounts[0].(map[string]any)
 	volume := first["Volume"].(map[string]any)
-	if volume["VolumeId"] != "vol-existing" || volume["VolumeName"] != nil || first["StorageSource"] != nil || first["VolumeTemplate"] != nil {
+	if volume["VolumeId"] != "vol-existing" || volume["VolumeName"] != "named-volume" || first["StorageSource"] != nil || first["VolumeTemplate"] != nil {
 		t.Fatalf("Volume mount=%#v", first)
 	}
 	second := mounts[1].(map[string]any)
 	template := second["VolumeTemplate"].(map[string]any)
-	if template["VolumeTemplateName"] != "session-template" || template["ReuseKey"] != "${metadata.session_id}" || second["StorageSource"] != nil || second["Volume"] != nil {
+	if template["VolumeTemplateName"] != "session-template" || template["ReuseKey"] != nil || second["StorageSource"] != nil || second["Volume"] != nil {
 		t.Fatalf("VolumeTemplate mount=%#v", second)
 	}
 	info, err := client.Tools().Get(context.Background(), "sdt-volume")
@@ -407,7 +407,6 @@ func TestToolPreviewVolumeMountValidationAndCopy(t *testing.T) {
 		{{Name: "conflict", Source: &ToolStorageSource{CFS: &ToolCFSStorage{FileSystemID: "cfs", Path: "/"}}, Volume: &ToolVolumeRef{ID: "vol"}}},
 		{{Name: "relative-cos-path", Source: &ToolStorageSource{COS: &ToolCOSStorage{Endpoint: "bucket.cos.ap-test.myqcloud.com", BucketName: "bucket-1000000000", BucketPath: "relative"}}}},
 		{{Name: "incomplete-cfs", Source: &ToolStorageSource{CFS: &ToolCFSStorage{FileSystemID: "cfs"}}}},
-		{{Name: "both-identities", Volume: &ToolVolumeRef{ID: "vol", Name: "volume"}}},
 		{{Name: "missing-identity", Volume: &ToolVolumeRef{}}},
 		{{Name: "missing-template-name", VolumeTemplate: &ToolVolumeTemplateRef{ReuseKey: "key"}}},
 	}

@@ -3018,7 +3018,7 @@ type ToolVolumeRef struct {
 	// Name is the account-local Volume name.
 	Name string
 }
-    ToolVolumeRef selects one existing Preview Volume by exactly one identity.
+    ToolVolumeRef selects one existing Preview Volume by ID, name, or both.
 
 type ToolVolumeTemplateRef struct {
 	// Name is the VolumeTemplate name.
