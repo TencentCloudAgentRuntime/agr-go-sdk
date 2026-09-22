@@ -146,11 +146,21 @@ func TestRegistrySourceUnionAndPackageBoundary(t *testing.T) {
 	control := &registryTestControl{}
 	records := newRegistryTestClient(t, control).Registries().Records("reg")
 	ctx := context.Background()
-	valid := CreateRegistryRecordOptions{Name: "mcp", DescriptorType: RegistryDescriptorMCP, MCPSource: &RegistryMCPSource{Type: RegistrySourceManual, Descriptors: json.RawMessage(`{"name":"mcp"}`)}}
-	if _, err := records.Create(ctx, valid); err != nil {
-		t.Fatal(err)
+	valid := []CreateRegistryRecordOptions{
+		{Name: "mcp-manual", DescriptorType: RegistryDescriptorMCP, MCPSource: &RegistryMCPSource{Type: RegistrySourceManual, Descriptors: json.RawMessage(`{"name":"mcp"}`)}},
+		{Name: "mcp-url", DescriptorType: RegistryDescriptorMCP, MCPSource: &RegistryMCPSource{Type: RegistrySourceURLImport, EndpointURL: "https://example.invalid/mcp"}},
+		{Name: "a2a-manual", DescriptorType: RegistryDescriptorA2A, AgentSource: &RegistryAgentSource{Type: RegistrySourceManual, Descriptors: json.RawMessage(`{"name":"agent"}`)}},
+		{Name: "a2a-url", DescriptorType: RegistryDescriptorA2A, AgentSource: &RegistryAgentSource{Type: RegistrySourceURLImport, EndpointURL: "https://example.invalid/a2a"}},
+		{Name: "agui-manual", DescriptorType: RegistryDescriptorAGUI, AgentSource: &RegistryAgentSource{Type: RegistrySourceManual, Descriptors: json.RawMessage(`{"name":"ui"}`)}},
+		{Name: "custom", DescriptorType: RegistryDescriptorCustom, CustomDescriptors: json.RawMessage(`{"name":"custom"}`)},
+		{Name: "skill", DescriptorType: RegistryDescriptorAgentSkills, SkillSource: &RegistrySkillSource{Type: RegistrySourceManual, SkillMD: "# Skill"}},
 	}
-	invalid := valid
+	for _, input := range valid {
+		if _, err := records.Create(ctx, input); err != nil {
+			t.Fatalf("%s: %v", input.Name, err)
+		}
+	}
+	invalid := valid[0]
 	invalid.AgentSource = &RegistryAgentSource{Type: RegistrySourceURLImport, EndpointURL: "https://example.invalid"}
 	if _, err := records.Create(ctx, invalid); err == nil {
 		t.Fatal("multiple sources accepted")
@@ -160,7 +170,7 @@ func TestRegistrySourceUnionAndPackageBoundary(t *testing.T) {
 	if !errors.As(err, &sdk) || sdk.Code != Unsupported || sdk.Reason != "SKILL_PACKAGE_TRANSFER_UNAVAILABLE" {
 		t.Fatalf("package error=%#v", err)
 	}
-	if control.calls != 1 {
+	if control.calls != len(valid) {
 		t.Fatalf("invalid sources reached transport: %d", control.calls)
 	}
 }
