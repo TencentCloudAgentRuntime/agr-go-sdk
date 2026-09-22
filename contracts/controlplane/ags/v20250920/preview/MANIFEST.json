@@ -8,9 +8,9 @@
   "source_schema_sha256": "d09e09e9a53ef59521c36f7c3cd5eeb78ce4aef64b0832ba4862abe82a183744",
   "source_patch_sha256": "56544a0b5b4a14c59a1caedfc74d9486358fd42e6868d95f15e2a33b4ed09ef0",
   "source_effective_sha256": "32519794cc2df4c7515f1fd223515735135480dedb4408cd8fe9669e911bab88",
-  "sdk_effective_sha256": "6894d6357e6cc21445c97c9bd4f47bba72328c814edbdd234058965777bd8beb",
-  "sdk_effective_actions": 39,
-  "sdk_effective_objects": 129,
+  "sdk_effective_sha256": "a39ea8ecad7b36875b7b2085946b6834ab716c70274153fb82cbbd54521b542a",
+  "sdk_effective_actions": 56,
+  "sdk_effective_objects": 174,
   "field_maturity_default": "stable",
   "preview_fields": [
     {
@@ -68,6 +68,34 @@
       ]
     },
     {
+      "name": "ApproveRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "ApproveRegistryRecordRequest",
+      "response": "ApproveRegistryRecordResponse",
+      "objects": [
+        "ApproveRegistryRecordRequest",
+        "ApproveRegistryRecordResponse",
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction"
+      ]
+    },
+    {
+      "name": "CancelRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CancelRegistryRecordRequest",
+      "response": "CancelRegistryRecordResponse",
+      "objects": [
+        "CancelRegistryRecordRequest",
+        "CancelRegistryRecordResponse",
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction"
+      ]
+    },
+    {
       "name": "CreateDeployment",
       "resource": "deployment",
       "maturity": "stable",
@@ -94,6 +122,38 @@
       "objects": [
         "CreatePreCacheImageTaskRequest",
         "CreatePreCacheImageTaskResponse"
+      ]
+    },
+    {
+      "name": "CreateRegistry",
+      "resource": "registry",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CreateRegistryRequest",
+      "response": "CreateRegistryResponse",
+      "objects": [
+        "CloudRegistry",
+        "CloudTag",
+        "CreateRegistryRequest",
+        "CreateRegistryResponse"
+      ]
+    },
+    {
+      "name": "CreateRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "CreateRegistryRecordRequest",
+      "response": "CreateRegistryRecordResponse",
+      "objects": [
+        "CloudAgentSourceInput",
+        "CloudMCPSourceInput",
+        "CloudRecord",
+        "CloudRecordVersion",
+        "CloudSkillSourceInput",
+        "CloudVersionApprovalAction",
+        "CreateRegistryRecordRequest",
+        "CreateRegistryRecordResponse"
       ]
     },
     {
@@ -205,6 +265,30 @@
       "objects": [
         "DeleteDeploymentRequest",
         "DeleteDeploymentResponse"
+      ]
+    },
+    {
+      "name": "DeleteRegistry",
+      "resource": "registry",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DeleteRegistryRequest",
+      "response": "DeleteRegistryResponse",
+      "objects": [
+        "DeleteRegistryRequest",
+        "DeleteRegistryResponse"
+      ]
+    },
+    {
+      "name": "DeleteRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DeleteRegistryRecordRequest",
+      "response": "DeleteRegistryRecordResponse",
+      "objects": [
+        "DeleteRegistryRecordRequest",
+        "DeleteRegistryRecordResponse"
       ]
     },
     {
@@ -329,6 +413,92 @@
       "objects": [
         "DescribePreCacheImageTaskRequest",
         "DescribePreCacheImageTaskResponse"
+      ]
+    },
+    {
+      "name": "DescribeRegistry",
+      "resource": "registry",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeRegistryRequest",
+      "response": "DescribeRegistryResponse",
+      "objects": [
+        "CloudRegistry",
+        "CloudTag",
+        "DescribeRegistryRequest",
+        "DescribeRegistryResponse"
+      ]
+    },
+    {
+      "name": "DescribeRegistryAuditLogList",
+      "resource": "registry_audit_log",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeRegistryAuditLogListRequest",
+      "response": "DescribeRegistryAuditLogListResponse",
+      "objects": [
+        "CloudAuditLog",
+        "DescribeRegistryAuditLogListRequest",
+        "DescribeRegistryAuditLogListResponse"
+      ]
+    },
+    {
+      "name": "DescribeRegistryList",
+      "resource": "registry",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeRegistryListRequest",
+      "response": "DescribeRegistryListResponse",
+      "objects": [
+        "CloudFilter",
+        "CloudRegistry",
+        "CloudTag",
+        "DescribeRegistryListRequest",
+        "DescribeRegistryListResponse"
+      ]
+    },
+    {
+      "name": "DescribeRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeRegistryRecordRequest",
+      "response": "DescribeRegistryRecordResponse",
+      "objects": [
+        "CloudRecord",
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction",
+        "DescribeRegistryRecordRequest",
+        "DescribeRegistryRecordResponse"
+      ]
+    },
+    {
+      "name": "DescribeRegistryRecordList",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeRegistryRecordListRequest",
+      "response": "DescribeRegistryRecordListResponse",
+      "objects": [
+        "CloudFilter",
+        "CloudRecord",
+        "DescribeRegistryRecordListRequest",
+        "DescribeRegistryRecordListResponse"
+      ]
+    },
+    {
+      "name": "DescribeRegistryRecordVersionList",
+      "resource": "registry_record_version",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "DescribeRegistryRecordVersionListRequest",
+      "response": "DescribeRegistryRecordVersionListResponse",
+      "objects": [
+        "CloudFilter",
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction",
+        "DescribeRegistryRecordVersionListRequest",
+        "DescribeRegistryRecordVersionListResponse"
       ]
     },
     {
@@ -547,6 +717,32 @@
       ]
     },
     {
+      "name": "PreviewRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "PreviewRegistryRecordRequest",
+      "response": "PreviewRegistryRecordResponse",
+      "objects": [
+        "PreviewRegistryRecordRequest",
+        "PreviewRegistryRecordResponse"
+      ]
+    },
+    {
+      "name": "RejectRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "RejectRegistryRecordRequest",
+      "response": "RejectRegistryRecordResponse",
+      "objects": [
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction",
+        "RejectRegistryRecordRequest",
+        "RejectRegistryRecordResponse"
+      ]
+    },
+    {
       "name": "ResumeSandboxInstance",
       "resource": "sandbox",
       "maturity": "stable",
@@ -594,6 +790,54 @@
       "objects": [
         "StopSandboxInstanceRequest",
         "StopSandboxInstanceResponse"
+      ]
+    },
+    {
+      "name": "SyncRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "SyncRegistryRecordRequest",
+      "response": "SyncRegistryRecordResponse",
+      "objects": [
+        "CloudRecord",
+        "CloudRecordVersion",
+        "CloudVersionApprovalAction",
+        "SyncRegistryRecordRequest",
+        "SyncRegistryRecordResponse"
+      ]
+    },
+    {
+      "name": "UpdateRegistry",
+      "resource": "registry",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "UpdateRegistryRequest",
+      "response": "UpdateRegistryResponse",
+      "objects": [
+        "CloudRegistry",
+        "CloudTag",
+        "UpdateRegistryRequest",
+        "UpdateRegistryResponse"
+      ]
+    },
+    {
+      "name": "UpdateRegistryRecord",
+      "resource": "registry_record",
+      "maturity": "preview",
+      "route": "common_raw",
+      "request": "UpdateRegistryRecordRequest",
+      "response": "UpdateRegistryRecordResponse",
+      "objects": [
+        "CloudAgentSourceInput",
+        "CloudMCPSourceInput",
+        "CloudRecord",
+        "CloudRecordLabelMutation",
+        "CloudRecordVersion",
+        "CloudSkillSourceInput",
+        "CloudVersionApprovalAction",
+        "UpdateRegistryRecordRequest",
+        "UpdateRegistryRecordResponse"
       ]
     },
     {

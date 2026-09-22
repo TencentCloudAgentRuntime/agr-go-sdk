@@ -21,6 +21,20 @@
       "output": "AppendEventResponse",
       "status": "online"
     },
+    "ApproveRegistryRecord": {
+      "document": "通过 Version 审批：PENDING_APPROVAL → APPROVED。Comment 必填。",
+      "input": "ApproveRegistryRecordRequest",
+      "name": "Approve a record version",
+      "output": "ApproveRegistryRecordResponse",
+      "status": "online"
+    },
+    "CancelRegistryRecord": {
+      "document": "PREPARING/PENDING_APPROVAL → CANCELED。Comment 必填。",
+      "input": "CancelRegistryRecordRequest",
+      "name": "Cancel a record version",
+      "output": "CancelRegistryRecordResponse",
+      "status": "online"
+    },
     "CreateDeployment": {
       "document": "创建 Deployment",
       "input": "CreateDeploymentRequest",
@@ -33,6 +47,20 @@
       "input": "CreatePreCacheImageTaskRequest",
       "name": "创建预热镜像任务",
       "output": "CreatePreCacheImageTaskResponse",
+      "status": "online"
+    },
+    "CreateRegistry": {
+      "document": "创建 Agent Registry（注册中心）。",
+      "input": "CreateRegistryRequest",
+      "name": "Create a registry",
+      "output": "CreateRegistryResponse",
+      "status": "online"
+    },
+    "CreateRegistryRecord": {
+      "document": "统一创建 Registry Record（含 revision 1）。请求通过 DescriptorType 与严格内容输入 Union 选择底层类型：MCPSource / AgentSource / SkillSource / CustomDescriptors 四选一，必须与 DescriptorType 对应。不接受 RecordId 或 ChangeLog；同名 Record 返回冲突，不隐式追加 Version。追加 Version 请使用 UpdateRegistryRecord。",
+      "input": "CreateRegistryRecordRequest",
+      "name": "Create a record and its first version",
+      "output": "CreateRegistryRecordResponse",
       "status": "online"
     },
     "CreateSandboxTool": {
@@ -75,6 +103,20 @@
       "input": "DeleteDeploymentRequest",
       "name": "删除 Deployment",
       "output": "DeleteDeploymentResponse",
+      "status": "online"
+    },
+    "DeleteRegistry": {
+      "document": "删除 Registry。",
+      "input": "DeleteRegistryRequest",
+      "name": "Delete an empty registry",
+      "output": "DeleteRegistryResponse",
+      "status": "online"
+    },
+    "DeleteRegistryRecord": {
+      "document": "删除 Registry Record 或指定 Version。省略 VersionId 时对整个 Record 进行软删除；传入 VersionId 时只删除指定 Version（Stable 指向的 Version 不允许删除；仅剩一个 Approved Version 时不允许删除）。取代原 DeleteRegistryRecordVersion。",
+      "input": "DeleteRegistryRecordRequest",
+      "name": "Delete a record or a version",
+      "output": "DeleteRegistryRecordResponse",
       "status": "online"
     },
     "DeleteSandboxTool": {
@@ -138,6 +180,48 @@
       "input": "DescribePreCacheImageTaskRequest",
       "name": "查询镜像预热任务信息",
       "output": "DescribePreCacheImageTaskResponse",
+      "status": "online"
+    },
+    "DescribeRegistry": {
+      "document": "按 RegistryId 查询 Registry 详情。",
+      "input": "DescribeRegistryRequest",
+      "name": "Get a registry",
+      "output": "DescribeRegistryResponse",
+      "status": "online"
+    },
+    "DescribeRegistryAuditLogList": {
+      "document": "分页查询指定Registry / Record / Version的审计日志。",
+      "input": "DescribeRegistryAuditLogListRequest",
+      "name": "List registry audit logs",
+      "output": "DescribeRegistryAuditLogListResponse",
+      "status": "online"
+    },
+    "DescribeRegistryList": {
+      "document": "分页查询当前租户可见的 Registry 列表。",
+      "input": "DescribeRegistryListRequest",
+      "name": "List registries",
+      "output": "DescribeRegistryListResponse",
+      "status": "online"
+    },
+    "DescribeRegistryRecord": {
+      "document": "查询 Record 详情和其中一个 Version。请求可通过互斥的 VersionId 或 Label 选择 Version；均省略时默认 Label=stable。取代原 DescribeRegistryRecordVersion。",
+      "input": "DescribeRegistryRecordRequest",
+      "name": "Get a record and resolve a version",
+      "output": "DescribeRegistryRecordResponse",
+      "status": "online"
+    },
+    "DescribeRegistryRecordList": {
+      "document": "分页查询 Registry 下的 Record 列表。list 类接口不接入 CAM 转发鉴权；业务侧按 CAM 二次过滤。",
+      "input": "DescribeRegistryRecordListRequest",
+      "name": "List registry records",
+      "output": "DescribeRegistryRecordListResponse",
+      "status": "online"
+    },
+    "DescribeRegistryRecordVersionList": {
+      "document": "分页查询 Record 的 Version 列表。list 类接口不接入 CAM 转发鉴权。",
+      "input": "DescribeRegistryRecordVersionListRequest",
+      "name": "List record versions",
+      "output": "DescribeRegistryRecordVersionListResponse",
       "status": "online"
     },
     "DescribeSandboxInstanceList": {
@@ -224,6 +308,20 @@
       "output": "PauseSandboxInstanceResponse",
       "status": "online"
     },
+    "PreviewRegistryRecord": {
+      "document": "对 Record 的指定 Version 或 Label 目标发起一次预览调用。VersionId 与 Label 互斥；均省略时使用 Stable。不创建 Version、不修改 Label。",
+      "input": "PreviewRegistryRecordRequest",
+      "name": "Preview remote record changes",
+      "output": "PreviewRegistryRecordResponse",
+      "status": "online"
+    },
+    "RejectRegistryRecord": {
+      "document": "驳回 Version 审批：PENDING_APPROVAL → REJECTED。Comment 必填。",
+      "input": "RejectRegistryRecordRequest",
+      "name": "Reject a record version",
+      "output": "RejectRegistryRecordResponse",
+      "status": "online"
+    },
     "ResumeSandboxInstance": {
       "document": "恢复沙箱实例",
       "input": "ResumeSandboxInstanceRequest",
@@ -243,6 +341,27 @@
       "input": "StopSandboxInstanceRequest",
       "name": "停止沙箱实例",
       "output": "StopSandboxInstanceResponse",
+      "status": "online"
+    },
+    "SyncRegistryRecord": {
+      "document": "触发一次从远端拉取描述符 / 元数据的同步。可通过互斥的 VersionId 或 Label 指定来源 Version，均省略时默认使用 Stable。有变化时创建新 Version 并移动 Latest；来源必须 SourceType=URL_IMPORT，否则返回 UnsupportedOperation.SourceType。",
+      "input": "SyncRegistryRecordRequest",
+      "name": "Synchronize a remote record source",
+      "output": "SyncRegistryRecordResponse",
+      "status": "online"
+    },
+    "UpdateRegistry": {
+      "document": "更新 Registry 的可变元数据。",
+      "input": "UpdateRegistryRequest",
+      "name": "Update a registry description",
+      "output": "UpdateRegistryResponse",
+      "status": "online"
+    },
+    "UpdateRegistryRecord": {
+      "document": "更新 Registry Record。两种互斥模式：①Record 更新模式：不提交任何 Source / CustomDescriptors，可通过 Description、LabelMutations 修改元数据与 Label（至少提交一项）；②Version 创建模式：提交且仅提交一种与现有 DescriptorType 匹配的内容输入，可选 VersionName / ChangeLog，禁止 Description / LabelMutations，服务端在 Record 下创建下一个 Revision。取代原 ChangeRegistryRecordStableVersion / RollbackRegistryRecordVersion / Create*RegistryRecordVersion。",
+      "input": "UpdateRegistryRecordRequest",
+      "name": "Update record metadata, labels, or content",
+      "output": "UpdateRegistryRecordResponse",
       "status": "online"
     },
     "UpdateSandboxInstance": {
@@ -520,6 +639,55 @@
       ],
       "type": "object"
     },
+    "ApproveRegistryRecordRequest": {
+      "document": "ApproveRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Version ID。",
+          "member": "string",
+          "name": "VersionId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "动作留言；非空。",
+          "member": "string",
+          "name": "Comment",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "ApproveRegistryRecordResponse": {
+      "document": "ApproveRegistryRecord response",
+      "members": [
+        {
+          "document": "更新后的 Version。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
     "CLSConfig": {
       "document": "沙箱工具日志推送CLS相关配置",
       "members": [
@@ -536,6 +704,55 @@
         }
       ],
       "usage": "both"
+    },
+    "CancelRegistryRecordRequest": {
+      "document": "CancelRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Version ID。",
+          "member": "string",
+          "name": "VersionId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "动作留言；非空。",
+          "member": "string",
+          "name": "Comment",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "CancelRegistryRecordResponse": {
+      "document": "CancelRegistryRecord response",
+      "members": [
+        {
+          "document": "更新后的 Version。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
     },
     "CfsSource": {
       "document": "CFS 真实存储来源。",
@@ -622,6 +839,787 @@
         }
       ],
       "usage": "both"
+    },
+    "CloudAgentSourceInput": {
+      "document": "Agent Record 内容来源。Type 判别 MANUAL 与 URL_IMPORT。",
+      "members": [
+        {
+          "document": "来源类型。MANUAL：直接提交 Agent Descriptors JSON 文本；URL_IMPORT：从远端 Agent Card / AGUI 端点导入。",
+          "member": "string",
+          "name": "Type",
+          "required": true,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "Type=MANUAL 时必填；值为通用 JSON object 文本；A2A 标准校验或 AGUI/CUSTOM 规则由后端执行。（JSON 字符串形式）",
+          "member": "string",
+          "name": "Descriptors",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "A2A：Agent Card URL；AGUI：Runtime Endpoint URL。Type=URL_IMPORT 时必填，HTTPS。",
+          "member": "string",
+          "name": "EndpointURL",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "CloudAuditLog": {
+      "document": "审计日志条目。记录 Registry / Record / Version 维度的动作。",
+      "members": [
+        {
+          "document": "审计日志 ID。",
+          "member": "string",
+          "name": "AuditLogId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "所属 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "动作发起者（主账号 UIN 或子账号 UIN）。",
+          "member": "string",
+          "name": "Actor",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Action 名称，等同 X-TC-Action。",
+          "member": "string",
+          "name": "Action",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "动作脱敏摘要对象；使用云 API 字段命名，字段随 Action 而变；不包含凭据、预签名 URL 或完整 Descriptor。（JSON 字符串形式）",
+          "member": "string",
+          "name": "Details",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "动作发生时间。",
+          "member": "string",
+          "name": "CreateTime",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "关联 Record ID；仅 Record / Version 相关动作。",
+          "member": "string",
+          "name": "RecordId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "关联 Version ID；仅 Version 相关动作。",
+          "member": "string",
+          "name": "VersionId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "CloudFilter": {
+      "document": "通用过滤条件。Name 为字段名，Values 为字段候选值；字段间 AND、Values 内 OR。",
+      "members": [
+        {
+          "document": "过滤字段名。DescribeRegistryList 支持  name  /  search （模糊搜索）与  archived  /  status （true / false / all）；DescribeRegistryRecordList 支持  name  /  search （模糊）、 descriptor_type 、 lifecycle_status （精确）。",
+          "member": "string",
+          "name": "Name",
+          "required": true,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "过滤字段候选值列表；至少 1 项。",
+          "member": "string",
+          "name": "Values",
+          "required": true,
+          "type": "list",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "CloudMCPSourceInput": {
+      "document": "MCP Record 内容来源。Type 判别 MANUAL 与 URL_IMPORT。",
+      "members": [
+        {
+          "document": "来源类型。MANUAL：直接提交 MCP Descriptors JSON 文本；URL_IMPORT：从远端 MCP Streamable HTTP endpoint 导入。",
+          "member": "string",
+          "name": "Type",
+          "required": true,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "Type=MANUAL 时必填；值为完整 MCP server.json 对象的 JSON 文本；完整 MCP 2025-12-11 标准校验由后端执行。（JSON 字符串形式）",
+          "member": "string",
+          "name": "Descriptors",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "远端 MCP Streamable HTTP endpoint URL；HTTPS。Type=URL_IMPORT 时必填。Version 从远端 initialize.serverInfo.version 观测获得，无需请求参数。",
+          "member": "string",
+          "name": "EndpointURL",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "CloudRecord": {
+      "document": "Registry Record 对象。Record 只保存元数据；协议描述符与内容状态请通过 Version 相关接口获取。",
+      "members": [
+        {
+          "document": "Record ID；格式 `rec-` + 8 位小写字母/数字。",
+          "member": "string",
+          "name": "RecordId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "所属 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Record 名称；同一 Registry 内活动 Record 的名称必须唯一。",
+          "member": "string",
+          "name": "Name",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "描述。",
+          "member": "string",
+          "name": "Description",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "协议描述符类型；创建后不可变。",
+          "member": "string",
+          "name": "DescriptorType",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "生命周期状态。ACTIVE：可用；DELETED：软删除墓碑，不再参与常规查询、下发或版本配额。",
+          "member": "string",
+          "name": "LifecycleStatus",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "所属租户 AppId。",
+          "member": "int64",
+          "name": "AppId",
+          "output_required": true,
+          "required": true,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建者主账号 UIN。",
+          "member": "string",
+          "name": "CreatorUin",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建者子账号 UIN；主账号直接创建时为空。",
+          "member": "string",
+          "name": "CreatorSubAccountUin",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建时间，ISO 8601 UTC。",
+          "member": "string",
+          "name": "CreateTime",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "最近一次更新时间。",
+          "member": "string",
+          "name": "UpdateTime",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Record 下未删除 Version 数量。",
+          "member": "int64",
+          "name": "VersionCount",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Record 下所有 Label Name（含未绑定 Label），包括系统 Label（stable / latest）和自定义 Label。仅名称，不含 VersionId、更新时间或操作者。",
+          "member": "string",
+          "name": "LabelSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "CloudRecordLabelMutation": {
+      "document": "Record Label 变更操作项。Operation=SET 时可携带 VersionId；DELETE 时禁止 VersionId。",
+      "members": [
+        {
+          "document": "操作类型。SET：创建或移动 Label；DELETE：删除自定义 Label（stable/latest 保留 Label 禁止删除）。",
+          "member": "string",
+          "name": "Operation",
+          "required": true,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "Label 名称，长度 1..63，格式 ^[a-z][a-z0-9._-]{0,62}$，按小写规范化。stable、latest 为系统保留 Label。",
+          "member": "string",
+          "name": "Name",
+          "required": true,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "目标 Version ID。SET 时可选：省略表示未绑定（自定义 Label 允许，stable 禁止）；DELETE 时禁止携带。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "变更原因，最大 1024 字符，可选。",
+          "member": "string",
+          "name": "Reason",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "CloudRecordVersion": {
+      "document": "Record 的一个不可变 Version 快照；记录了描述符、来源配置与审批状态。",
+      "members": [
+        {
+          "document": "Version ID；格式 `rv-` + 8 位小写字母/数字。",
+          "member": "string",
+          "name": "VersionId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "所属 Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Version 递增序号（1 起）。",
+          "member": "int64",
+          "name": "Revision",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Version 状态。",
+          "member": "string",
+          "name": "Status",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "审批模式；创建时锁定，后续变更 Registry 审批模式不影响本 Version。",
+          "member": "string",
+          "name": "ApprovalMode",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "所属租户 AppId。",
+          "member": "int64",
+          "name": "AppId",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建者主账号 UIN。",
+          "member": "string",
+          "name": "CreatorUin",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建时间。",
+          "member": "string",
+          "name": "CreateTime",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "最近一次更新时间。",
+          "member": "string",
+          "name": "UpdateTime",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Version 别名（可选）。",
+          "member": "string",
+          "name": "VersionName",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "协议描述符对象。（JSON 字符串形式）",
+          "member": "string",
+          "name": "Descriptors",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "内容来源。",
+          "member": "string",
+          "name": "SourceType",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "规范化来源配置对象。（JSON 字符串形式）",
+          "member": "string",
+          "name": "SourceConfig",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "内容状态。",
+          "member": "string",
+          "name": "ContentStatus",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "READY 内容 SHA-256。",
+          "member": "string",
+          "name": "ContentSHA256",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "READY 内容字节数。",
+          "member": "int64",
+          "name": "ContentSizeBytes",
+          "output_required": false,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "配置内容规范化后的 SHA-256（用于幂等去重）。",
+          "member": "string",
+          "name": "ConfigSHA256",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建者子账号 UIN。",
+          "member": "string",
+          "name": "CreatorSubAccountUin",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Version 历次审批动作。",
+          "member": "CloudVersionApprovalAction",
+          "name": "ApprovalActions",
+          "output_required": false,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "document": "TAR 内容成功校验、完成物化并进入 READY 的时间；MANUAL / URL_IMPORT 或尚未 READY 的 TAR_PACKAGE 均为空。",
+          "member": "string",
+          "name": "ContentReadyTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "本次 Version 的变更原因，最大 4096 字符；不可修改。Revision 1 或未填写时返回空字符串。",
+          "member": "string",
+          "name": "ChangeLog",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "当前绑定该 Version 的 Label Name 列表（例如 stable / latest 或自定义 Label 名称）。未绑定 Label 不在此返回。",
+          "member": "string",
+          "name": "LabelSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "CloudRegistry": {
+      "document": "Registry 对象。包含注册中心的基本信息与 Record 计数。",
+      "members": [
+        {
+          "document": "Registry ID；格式  reg-  + 8 位小写字母/数字。",
+          "member": "string",
+          "name": "RegistryId",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Registry 同一 AppId + Region 唯一名称。",
+          "member": "string",
+          "name": "Name",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "描述。",
+          "member": "string",
+          "name": "Description",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "审批模式；AUTO 自动通过，MANUAL 需人工审批；创建时确定，不可修改。",
+          "member": "string",
+          "name": "ApprovalMode",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Registry 所在腾讯云地域，如  ap-guangzhou 。",
+          "member": "string",
+          "name": "Region",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Registry 状态。ACTIVE / ARCHIVED。",
+          "member": "string",
+          "name": "Status",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建时间，ISO 8601 UTC，如  2026-08-11T10:00:00Z 。",
+          "member": "string",
+          "name": "CreateTime",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "最近一次更新时间，ISO 8601 UTC。",
+          "member": "string",
+          "name": "UpdateTime",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Registry 下 Record 总数。",
+          "member": "int64",
+          "name": "RecordCount",
+          "output_required": true,
+          "required": true,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "权威读取的腾讯云自定义标签，按 Key、Value 稳定排序；无标签时固定返回空数组，不返回 null。",
+          "member": "CloudTag",
+          "name": "Tags",
+          "output_required": true,
+          "required": true,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Stable Label 已绑定的 Record 数量。Approved Version 数量和可对外消费的 Record 数量已不再等价。",
+          "member": "int64",
+          "name": "PublishedRecordCount",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "所属租户 AppId。",
+          "member": "int64",
+          "name": "AppId",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建者主账号 UIN。",
+          "member": "string",
+          "name": "CreatorUin",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "创建者子账号 UIN；主账号直接创建时为空字符串。",
+          "member": "string",
+          "name": "CreatorSubAccountUin",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "CloudSkillSourceInput": {
+      "document": "AGENT_SKILLS 内容来源。Type 判别 MANUAL 与 TAR_PACKAGE 两种模式。",
+      "members": [
+        {
+          "document": "来源类型。MANUAL：直接提交 SKILL.md 文本；TAR_PACKAGE：由服务端签发 COS PUT 预签名 URL，客户端上传后由服务端异步校验。",
+          "member": "string",
+          "name": "Type",
+          "required": true,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "SKILL.md 原文；Type=MANUAL 时必填非空；Type=TAR_PACKAGE 时不得提供。",
+          "member": "string",
+          "name": "SkillMd",
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "CloudTag": {
+      "document": "腾讯云自定义标签。",
+      "members": [
+        {
+          "document": "自定义标签键；不可使用 qcs:、project 或项目预留前缀，且不可包含首尾空格。",
+          "member": "string",
+          "name": "Key",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "自定义标签值，不可包含首尾空格。",
+          "member": "string",
+          "name": "Value",
+          "output_required": true,
+          "required": true,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "CloudVersionApprovalAction": {
+      "document": "Version 一次审批动作条目。",
+      "members": [
+        {
+          "document": "动作 ID。",
+          "member": "string",
+          "name": "ActionId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "动作类型。",
+          "member": "string",
+          "name": "ActionType",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "动作发起者类型。USER 用户；SYSTEM 系统自动通过。",
+          "member": "string",
+          "name": "ActorType",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "发起者主账号 UIN。",
+          "member": "string",
+          "name": "ActorUin",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "发起者子账号 UIN。",
+          "member": "string",
+          "name": "ActorSubAccountUin",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "动作留言。",
+          "member": "string",
+          "name": "Comment",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "发生时间。",
+          "member": "string",
+          "name": "CreateTime",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "对应云 API 请求的 RequestId。",
+          "member": "string",
+          "name": "RequestId",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
     },
     "ComputerConfiguration": {
       "document": "桌面电脑环境类沙箱配置",
@@ -914,6 +1912,193 @@
           "member": "string",
           "name": "RequestId",
           "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "CreateRegistryRecordRequest": {
+      "document": "CreateRegistryRecord request",
+      "members": [
+        {
+          "document": "所属 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record 名称，长度 1..255，同一租户、Registry 内按规范化 Name 唯一（大小写不敏感）；软删除后允许复用。",
+          "member": "string",
+          "name": "Name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "协议描述符类型。MCP / A2A / AGUI / CUSTOM / AGENT_SKILLS。Record 创建后不可修改。",
+          "member": "string",
+          "name": "DescriptorType",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record 描述，最大 4096 字符，可选，默认空。",
+          "member": "string",
+          "name": "Description",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "Revision 1 的展示名称，可选。",
+          "member": "string",
+          "name": "VersionName",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "DescriptorType=MCP 时必填，其他类型禁止。",
+          "member": "CloudMCPSourceInput",
+          "name": "MCPSource",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "document": "DescriptorType=A2A 或 AGUI 时必填，其他类型禁止。",
+          "member": "CloudAgentSourceInput",
+          "name": "AgentSource",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "document": "DescriptorType=AGENT_SKILLS 时必填，其他类型禁止。",
+          "member": "CloudSkillSourceInput",
+          "name": "SkillSource",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "document": "DescriptorType=CUSTOM 时必填，其他类型禁止。内容必须是 JSON object 字符串；服务端解析后写入 CloudRecordVersion.Descriptors，Version 的 SourceType 固定为 MANUAL、SourceConfig 固定为空对象。",
+          "member": "string",
+          "name": "CustomDescriptors",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "CreateRegistryRecordResponse": {
+      "document": "CreateRegistryRecord response",
+      "members": [
+        {
+          "document": "新 Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "新建的 Record 详情。",
+          "member": "CloudRecord",
+          "name": "Record",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "本次创建的 Revision 1 Version 详情。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "SkillSource.Type=TAR_PACKAGE 时返回：TAR 包上传预签名 URL。",
+          "member": "string",
+          "name": "UploadURL",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "SkillSource.Type=TAR_PACKAGE 时返回：UploadURL 过期时间，ISO 8601 UTC。",
+          "member": "string",
+          "name": "ExpireTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "SkillSource.Type=TAR_PACKAGE 时返回：Version 内容当前状态（UPLOADING 等）。",
+          "member": "string",
+          "name": "ContentStatus",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "CreateRegistryRequest": {
+      "document": "CreateRegistry request",
+      "members": [
+        {
+          "document": "同一 AppId + Region 唯一、长度 1–255",
+          "member": "string",
+          "name": "Name",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "描述文本；最长 4096。",
+          "member": "string",
+          "name": "Description",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "审批模式；创建时确定，创建后不可修改；省略时默认为 AUTO，枚举值区分大小写。",
+          "member": "string",
+          "name": "ApprovalMode",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "创建时绑定的腾讯云自定义标签；Key 不可重复；最多 10 个。",
+          "member": "CloudTag",
+          "name": "Tags",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "CreateRegistryResponse": {
+      "document": "CreateRegistry response",
+      "members": [
+        {
+          "document": "创建成功的 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Registry 详细信息。",
+          "member": "CloudRegistry",
+          "name": "Registry",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
         }
       ],
       "type": "object"
@@ -1694,6 +2879,63 @@
       ],
       "type": "object"
     },
+    "DeleteRegistryRecordRequest": {
+      "document": "DeleteRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "可选。传入时只删除 Record 下指定 Version（软删除）；省略时删除整个 Record。显式传入空字符串或 null 返回 InvalidParameter.VersionId，不得回退为删除整个 Record。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "删除原因。删除单个 Version 时必填，去除首尾空白后最大 4096 字符；删除整个 Record 时可选。",
+          "member": "string",
+          "name": "Reason",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DeleteRegistryRecordResponse": {
+      "document": "DeleteRegistryRecord response",
+      "members": [],
+      "type": "object"
+    },
+    "DeleteRegistryRequest": {
+      "document": "DeleteRegistry request",
+      "members": [
+        {
+          "document": "Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DeleteRegistryResponse": {
+      "document": "DeleteRegistry response",
+      "members": [],
+      "type": "object"
+    },
     "DeleteSandboxToolRequest": {
       "document": "DeleteSandboxTool请求参数结构体",
       "members": [
@@ -2272,6 +3514,377 @@
           "member": "string",
           "name": "RequestId",
           "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryAuditLogListRequest": {
+      "document": "DescribeRegistryAuditLogList request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "Version ID；仅过滤 Version 维度动作，可选。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "Action 精确过滤（如 `record.version.create`），可选。",
+          "member": "string",
+          "name": "ActionFilter",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "发起者过滤（主账号 UIN 或子账号 UIN），可选。",
+          "member": "string",
+          "name": "Actor",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "起始时间；ISO 8601，可选。",
+          "member": "string",
+          "name": "StartTime",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "结束时间；ISO 8601，可选。",
+          "member": "string",
+          "name": "EndTime",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "分页起始偏移，默认 0。",
+          "member": "int64",
+          "name": "Offset",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "分页条数，默认 20，最大 100。",
+          "member": "int64",
+          "name": "Limit",
+          "required": false,
+          "type": "int64"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryAuditLogListResponse": {
+      "document": "DescribeRegistryAuditLogList response",
+      "members": [
+        {
+          "document": "Record 维度的审计日志。",
+          "member": "CloudAuditLog",
+          "name": "AuditLogSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "document": "符合条件的总数。",
+          "member": "int64",
+          "name": "TotalCount",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryListRequest": {
+      "document": "DescribeRegistryList request",
+      "members": [
+        {
+          "document": "分页起始偏移，默认 0。",
+          "member": "int64",
+          "name": "Offset",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "分页条数，默认 20，最大 100。",
+          "member": "int64",
+          "name": "Limit",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "过滤条件。Name 支持：`name`/`search`（模糊）、`archived`/`status`（true/false/all）、`tag-key` 和 `tag: `；最多 6 个标签过滤组，每个标签过滤组最多 10 个 Values，同 Key 多值为 OR，不同 Key 为 AND。",
+          "member": "CloudFilter",
+          "name": "Filters",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryListResponse": {
+      "document": "DescribeRegistryList response",
+      "members": [
+        {
+          "document": "Registry 对象数组。",
+          "member": "CloudRegistry",
+          "name": "RegistrySet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "document": "符合条件的总数。",
+          "member": "int64",
+          "name": "TotalCount",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRecordListRequest": {
+      "document": "DescribeRegistryRecordList request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "分页起始偏移，默认 0。",
+          "member": "int64",
+          "name": "Offset",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "分页条数，默认 20，最大 100。",
+          "member": "int64",
+          "name": "Limit",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "过滤条件。支持 Filter.Name： name / search （按 Record Name 模糊搜索）；其他名称返回  InvalidParameter.Filters.Name 。",
+          "member": "CloudFilter",
+          "name": "Filters",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRecordListResponse": {
+      "document": "DescribeRegistryRecordList response",
+      "members": [
+        {
+          "document": "Record 对象数组。",
+          "member": "CloudRecord",
+          "name": "RecordSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "document": "符合条件的总数。",
+          "member": "int64",
+          "name": "TotalCount",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRecordRequest": {
+      "document": "DescribeRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Version ID，与 Label 互斥。指定时返回该 Version；均省略时等价于 Label=stable。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "Label 名称，与 VersionId 互斥。指定时返回 Label 当前指向的 Version；均省略时等价于 stable。",
+          "member": "string",
+          "name": "Label",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRecordResponse": {
+      "document": "DescribeRegistryRecord response",
+      "members": [
+        {
+          "document": "Record 元数据和全部 Label。",
+          "member": "CloudRecord",
+          "name": "Record",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "根据 VersionId / Label 解析得到的完整 Version。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": true
+        },
+        {
+          "document": "解析方式：DEFAULT_STABLE / LABEL / VERSION_ID。",
+          "member": "string",
+          "name": "ResolvedBy",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "通过 Label 解析（ResolvedBy=LABEL 或 DEFAULT_STABLE）时返回该 Label 名称，例如 stable。",
+          "member": "string",
+          "name": "ResolvedLabel",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRecordVersionListRequest": {
+      "document": "DescribeRegistryRecordVersionList request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "分页起始偏移，默认 0。",
+          "member": "int64",
+          "name": "Offset",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "分页条数，默认 20，最大 100。",
+          "member": "int64",
+          "name": "Limit",
+          "required": false,
+          "type": "int64"
+        },
+        {
+          "document": "过滤条件。支持：status（按 Version 状态：PREPARING/PENDING_APPROVAL/APPROVED/REJECTED/CANCELED，多值 OR）、source_type（按内容来源：MANUAL/URL_IMPORT/TAR_PACKAGE，多值 OR）。",
+          "member": "CloudFilter",
+          "name": "Filters",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRecordVersionListResponse": {
+      "document": "DescribeRegistryRecordVersionList response",
+      "members": [
+        {
+          "document": "Version 对象数组。",
+          "member": "CloudRecordVersion",
+          "name": "VersionSet",
+          "output_required": true,
+          "required": false,
+          "type": "list",
+          "value_allowed_null": false
+        },
+        {
+          "document": "符合条件的总数。",
+          "member": "int64",
+          "name": "TotalCount",
+          "output_required": true,
+          "required": false,
+          "type": "int64",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryRequest": {
+      "document": "DescribeRegistry request",
+      "members": [
+        {
+          "document": "Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "DescribeRegistryResponse": {
+      "document": "DescribeRegistry response",
+      "members": [
+        {
+          "document": "Registry 详情。",
+          "member": "CloudRegistry",
+          "name": "Registry",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
         }
       ],
       "type": "object"
@@ -3846,6 +5459,64 @@
       ],
       "usage": "both"
     },
+    "PreviewRegistryRecordRequest": {
+      "document": "PreviewRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "可选。指定要预览的目标 Version；与 Label 互斥；均省略时使用 Stable。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "可选。指定要预览的目标 Label；与 VersionId 互斥；均省略时使用 Stable。",
+          "member": "string",
+          "name": "Label",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "PreviewRegistryRecordResponse": {
+      "document": "PreviewRegistryRecord response",
+      "members": [
+        {
+          "document": "只读元数据预览结果对象（JSON 字符串形式）。字段：StatusCode（远端 HTTP 状态码，必返）、Body（远端响应体截断字符串，必返）、HasUpdate（Boolean，必返；远端内容按 Sync 相同的规范化规则处理后是否与请求 Version 配置不同；Error 非空时固定返回 false，此时不表示远端没有变化）、Error（调用错误信息，可选）。",
+          "member": "string",
+          "name": "PreviewResult",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        },
+        {
+          "document": "实际预览的 Version ID（由 VersionId / Label 解析得到）。",
+          "member": "string",
+          "name": "ResolvedVersionId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
+    },
     "ProbeConfiguration": {
       "document": "健康检查探针配置",
       "members": [
@@ -3917,6 +5588,55 @@
         }
       ],
       "usage": "both"
+    },
+    "RejectRegistryRecordRequest": {
+      "document": "RejectRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Version ID。",
+          "member": "string",
+          "name": "VersionId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "动作留言；非空。",
+          "member": "string",
+          "name": "Comment",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "RejectRegistryRecordResponse": {
+      "document": "RejectRegistryRecord response",
+      "members": [
+        {
+          "document": "更新后的 Version。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
     },
     "ResourceConfiguration": {
       "document": "资源配置",
@@ -4933,6 +6653,116 @@
       "type": "object",
       "usage": "both"
     },
+    "SyncRegistryRecordRequest": {
+      "document": "SyncRegistryRecord request",
+      "members": [
+        {
+          "document": "父 Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "可选。指定要同步的目标 Version；与 Label 互斥；均省略时使用 Stable。",
+          "member": "string",
+          "name": "VersionId",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "可选。指定要同步的目标 Label；与 VersionId 互斥；均省略时使用 Stable。Label 在请求开始时只解析一次。",
+          "member": "string",
+          "name": "Label",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "可选，最大 4096 字符。若同步创建新 Version，将写入新 Version 的 ChangeLog；省略时保存为空。",
+          "member": "string",
+          "name": "ChangeLog",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "SyncRegistryRecordResponse": {
+      "document": "SyncRegistryRecord response",
+      "members": [
+        {
+          "document": "同步结果：UNCHANGED（远端无变化）/ VERSION_CREATED（远端有变化，已生成新 Version）/ FAILED（同步失败）。",
+          "member": "string",
+          "name": "SyncStatus",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "作为同步来源解析出的 Version ID（可能由 Label 解析而来）；不为空。",
+          "member": "string",
+          "name": "ResolvedVersionId",
+          "output_required": true,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "SyncStatus=VERSION_CREATED 时返回：本次新建的 Version。",
+          "member": "CloudRecordVersion",
+          "name": "CreatedVersion",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "SyncStatus=VERSION_CREATED 时返回：同步后的最新 Record。",
+          "member": "CloudRecord",
+          "name": "Record",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "最后一次同步时间，ISO 8601 UTC。",
+          "member": "string",
+          "name": "LastSyncTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "失败错误码；SyncStatus=FAILED 时返回。",
+          "member": "string",
+          "name": "ErrorCode",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "失败错误信息；SyncStatus=FAILED 时返回。",
+          "member": "string",
+          "name": "ErrorMessage",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
     "Tag": {
       "document": "标签",
       "members": [
@@ -4960,6 +6790,168 @@
         }
       ],
       "usage": "both"
+    },
+    "UpdateRegistryRecordRequest": {
+      "document": "UpdateRegistryRecord request",
+      "members": [
+        {
+          "document": "Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record ID。",
+          "member": "string",
+          "name": "RecordId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "Record 描述，可选。Record 更新模式下允许，允许空字符串清空；Version 创建模式禁止。",
+          "member": "string",
+          "name": "Description",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "新 Version 的展示名，可选。仅 Version 创建模式允许。",
+          "member": "string",
+          "name": "VersionName",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "新 Version 的变更原因，最大 4096 字符，可选。仅 Version 创建模式允许。",
+          "member": "string",
+          "name": "ChangeLog",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "Version 创建模式：现有 Record 的 DescriptorType=MCP 时可提交。",
+          "member": "CloudMCPSourceInput",
+          "name": "MCPSource",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "document": "Version 创建模式：现有 Record 的 DescriptorType=A2A 或 AGUI 时可提交。",
+          "member": "CloudAgentSourceInput",
+          "name": "AgentSource",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "document": "Version 创建模式：现有 Record 的 DescriptorType=AGENT_SKILLS 时可提交。",
+          "member": "CloudSkillSourceInput",
+          "name": "SkillSource",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "document": "Version 创建模式：现有 Record 的 DescriptorType=CUSTOM 时可提交，必须是 JSON object 字符串。",
+          "member": "string",
+          "name": "CustomDescriptors",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "document": "Record 更新模式：Label 变更列表，最多 32 条，同一次请求中 Label Name 不可重复。",
+          "member": "CloudRecordLabelMutation",
+          "name": "LabelMutations",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "type": "object"
+    },
+    "UpdateRegistryRecordResponse": {
+      "document": "UpdateRegistryRecord response",
+      "members": [
+        {
+          "document": "更新后的 Record。",
+          "member": "CloudRecord",
+          "name": "Record",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Version 创建模式返回：本次创建的新 Version。",
+          "member": "CloudRecordVersion",
+          "name": "Version",
+          "output_required": false,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        },
+        {
+          "document": "Version 创建模式且 SkillSource.Type=TAR_PACKAGE 时返回。",
+          "member": "string",
+          "name": "UploadURL",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "Version 创建模式且 SkillSource.Type=TAR_PACKAGE 时返回。",
+          "member": "string",
+          "name": "ExpireTime",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        },
+        {
+          "document": "Version 创建模式且 SkillSource.Type=TAR_PACKAGE 时返回。",
+          "member": "string",
+          "name": "ContentStatus",
+          "output_required": false,
+          "required": false,
+          "type": "string",
+          "value_allowed_null": true
+        }
+      ],
+      "type": "object"
+    },
+    "UpdateRegistryRequest": {
+      "document": "UpdateRegistry request",
+      "members": [
+        {
+          "document": "Registry ID。",
+          "member": "string",
+          "name": "RegistryId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "document": "新的描述；必填；最长 4096。",
+          "member": "string",
+          "name": "Description",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "type": "object"
+    },
+    "UpdateRegistryResponse": {
+      "document": "UpdateRegistry response",
+      "members": [
+        {
+          "document": "更新后的 Registry 详情。",
+          "member": "CloudRegistry",
+          "name": "Registry",
+          "output_required": true,
+          "required": false,
+          "type": "object",
+          "value_allowed_null": false
+        }
+      ],
+      "type": "object"
     },
     "UpdateSandboxInstanceRequest": {
       "document": "UpdateSandboxInstance请求参数结构体",
