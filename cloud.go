@@ -278,16 +278,16 @@ func (c *controlAdapter) ListVolumes(ctx context.Context, opts VolumeListOptions
 	return page, nil
 }
 
-func (c *controlAdapter) UpdateVolume(ctx context.Context, id string, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
-	out, err := c.service.UpdateVolume(ctx, id, controlUpdateVolume(opts))
+func (c *controlAdapter) UpdateVolume(ctx context.Context, target volumeTarget, opts UpdateVolumeOptions) (VolumeMutationResult, error) {
+	out, err := c.service.UpdateVolume(ctx, controlVolumeTarget(target), controlUpdateVolume(opts))
 	if err != nil {
-		return VolumeMutationResult{}, withResourceError(normalizeError("Volumes.Update", err), "volume", id)
+		return VolumeMutationResult{}, withResourceError(normalizeError("Volumes.Update", err), "volume", volumeTargetLabel(target))
 	}
 	return VolumeMutationResult{VolumeID: out.ResourceID, RequestID: out.RequestID}, nil
 }
 
-func (c *controlAdapter) DeleteVolume(ctx context.Context, id string) error {
-	return withResourceError(normalizeError("Volumes.Delete", c.service.DeleteVolume(ctx, id)), "volume", id)
+func (c *controlAdapter) DeleteVolume(ctx context.Context, target volumeTarget) error {
+	return withResourceError(normalizeError("Volumes.Delete", c.service.DeleteVolume(ctx, controlVolumeTarget(target))), "volume", volumeTargetLabel(target))
 }
 
 func (c *controlAdapter) CreateVolumeTemplate(ctx context.Context, opts CreateVolumeTemplateOptions) (VolumeTemplateInfo, error) {
@@ -322,16 +322,16 @@ func (c *controlAdapter) ListVolumeTemplates(ctx context.Context, opts VolumeTem
 	return page, nil
 }
 
-func (c *controlAdapter) UpdateVolumeTemplate(ctx context.Context, id string, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
-	out, err := c.service.UpdateVolumeTemplate(ctx, id, controlUpdateVolumeTemplate(opts))
+func (c *controlAdapter) UpdateVolumeTemplate(ctx context.Context, target volumeTarget, opts UpdateVolumeTemplateOptions) (VolumeTemplateMutationResult, error) {
+	out, err := c.service.UpdateVolumeTemplate(ctx, controlVolumeTarget(target), controlUpdateVolumeTemplate(opts))
 	if err != nil {
-		return VolumeTemplateMutationResult{}, withResourceError(normalizeError("VolumeTemplates.Update", err), "volume_template", id)
+		return VolumeTemplateMutationResult{}, withResourceError(normalizeError("VolumeTemplates.Update", err), "volume_template", volumeTargetLabel(target))
 	}
 	return VolumeTemplateMutationResult{VolumeTemplateID: out.ResourceID, RequestID: out.RequestID}, nil
 }
 
-func (c *controlAdapter) DeleteVolumeTemplate(ctx context.Context, id string) error {
-	return withResourceError(normalizeError("VolumeTemplates.Delete", c.service.DeleteVolumeTemplate(ctx, id)), "volume_template", id)
+func (c *controlAdapter) DeleteVolumeTemplate(ctx context.Context, target volumeTarget) error {
+	return withResourceError(normalizeError("VolumeTemplates.Delete", c.service.DeleteVolumeTemplate(ctx, controlVolumeTarget(target))), "volume_template", volumeTargetLabel(target))
 }
 
 func (c *controlAdapter) CreateSessionSpace(ctx context.Context, opts CreateSessionSpaceOptions) (SessionSpaceInfo, error) {
@@ -526,6 +526,235 @@ func eventInfoFrom(value controlplane.EventResult) EventInfo {
 	return EventInfo{EventInput: event, Timestamp: value.Event.Timestamp, RequestID: value.RequestID}
 }
 
+func (c *controlAdapter) CreateRegistry(ctx context.Context, opts CreateRegistryOptions) (RegistryInfo, error) {
+	out, err := c.service.CreateRegistry(ctx, controlplane.CreateRegistryRequest{Name: opts.Name, Description: opts.Description, ApprovalMode: string(opts.ApprovalMode), Tags: controlRegistryTags(opts.Tags)})
+	if err != nil {
+		return RegistryInfo{}, normalizeError("Registries.Create", err)
+	}
+	return registryInfoFrom(out), nil
+}
+
+func (c *controlAdapter) GetRegistry(ctx context.Context, id string) (RegistryInfo, error) {
+	out, err := c.service.GetRegistry(ctx, id)
+	if err != nil {
+		return RegistryInfo{}, withResourceError(normalizeError("Registries.Get", err), "registry", id)
+	}
+	return registryInfoFrom(out), nil
+}
+
+func (c *controlAdapter) ListRegistries(ctx context.Context, opts RegistryListOptions) (RegistryPage, error) {
+	out, err := c.service.ListRegistries(ctx, controlplane.RegistryListRequest{Offset: opts.Offset, Limit: opts.Limit, Filters: controlRegistryFilters(opts.Filters)})
+	if err != nil {
+		return RegistryPage{}, normalizeError("Registries.List", err)
+	}
+	page := RegistryPage{Items: make([]RegistryInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, registryInfoFrom(controlplane.RegistryResult{Registry: item}))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateRegistry(ctx context.Context, id string, opts UpdateRegistryOptions) (RegistryInfo, error) {
+	out, err := c.service.UpdateRegistry(ctx, id, controlplane.UpdateRegistryRequest{Description: opts.Description})
+	if err != nil {
+		return RegistryInfo{}, withResourceError(normalizeError("Registries.Update", err), "registry", id)
+	}
+	return registryInfoFrom(out), nil
+}
+
+func (c *controlAdapter) DeleteRegistry(ctx context.Context, id string) error {
+	return withResourceError(normalizeError("Registries.Delete", c.service.DeleteRegistry(ctx, id)), "registry", id)
+}
+
+func (c *controlAdapter) CreateRegistryRecord(ctx context.Context, registryID string, opts CreateRegistryRecordOptions) (RegistryRecordResult, error) {
+	in := controlplane.CreateRegistryRecordRequest{Name: opts.Name, Description: opts.Description, VersionName: opts.VersionName, DescriptorType: string(opts.DescriptorType), MCPSource: controlRegistryMCPSource(opts.MCPSource), AgentSource: controlRegistryAgentSource(opts.AgentSource), SkillSource: controlRegistrySkillSource(opts.SkillSource), CustomDescriptors: append(json.RawMessage(nil), opts.CustomDescriptors...)}
+	out, err := c.service.CreateRegistryRecord(ctx, registryID, in)
+	if err != nil {
+		return RegistryRecordResult{}, withResourceError(normalizeError("Registries.Records.Create", err), "registry", registryID)
+	}
+	return registryRecordResultFrom(out), nil
+}
+
+func (c *controlAdapter) GetRegistryRecord(ctx context.Context, registryID, recordID string, selector *RegistryVersionSelector) (RegistryRecordResult, error) {
+	out, err := c.service.GetRegistryRecord(ctx, registryID, recordID, controlRegistrySelector(selector))
+	if err != nil {
+		return RegistryRecordResult{}, withResourceError(normalizeError("Registries.Records.Get", err), "registry_record", recordID)
+	}
+	return registryRecordResultFrom(out), nil
+}
+
+func (c *controlAdapter) ListRegistryRecords(ctx context.Context, registryID string, opts RegistryRecordListOptions) (RegistryRecordPage, error) {
+	out, err := c.service.ListRegistryRecords(ctx, registryID, controlplane.RegistryRecordListRequest{Offset: opts.Offset, Limit: opts.Limit, Filters: controlRegistryFilters(opts.Filters)})
+	if err != nil {
+		return RegistryRecordPage{}, withResourceError(normalizeError("Registries.Records.List", err), "registry", registryID)
+	}
+	page := RegistryRecordPage{Items: make([]RegistryRecordInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, registryRecordInfoFrom(item, ""))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) UpdateRegistryRecord(ctx context.Context, registryID, recordID string, opts UpdateRegistryRecordOptions) (RegistryRecordResult, error) {
+	in := controlplane.UpdateRegistryRecordRequest{Description: opts.Description, VersionName: opts.VersionName, ChangeLog: opts.ChangeLog, MCPSource: controlRegistryMCPSource(opts.MCPSource), AgentSource: controlRegistryAgentSource(opts.AgentSource), SkillSource: controlRegistrySkillSource(opts.SkillSource), CustomDescriptors: append(json.RawMessage(nil), opts.CustomDescriptors...)}
+	for _, value := range opts.LabelMutations {
+		in.LabelMutations = append(in.LabelMutations, controlplane.RegistryLabelMutation{Operation: string(value.Operation), Name: value.Name, VersionID: value.VersionID, Reason: value.Reason})
+	}
+	out, err := c.service.UpdateRegistryRecord(ctx, registryID, recordID, in)
+	if err != nil {
+		return RegistryRecordResult{}, withResourceError(normalizeError("Registries.Records.Update", err), "registry_record", recordID)
+	}
+	return registryRecordResultFrom(out), nil
+}
+
+func (c *controlAdapter) DeleteRegistryRecord(ctx context.Context, registryID, recordID string, opts DeleteRegistryRecordOptions) error {
+	in := controlplane.DeleteRegistryRecordRequest{Reason: opts.Reason}
+	if opts.Version != nil {
+		value := opts.Version.VersionID
+		in.VersionID = &value
+	}
+	return withResourceError(normalizeError("Registries.Records.Delete", c.service.DeleteRegistryRecord(ctx, registryID, recordID, in)), "registry_record", recordID)
+}
+
+func (c *controlAdapter) ListRegistryRecordVersions(ctx context.Context, registryID, recordID string, opts RegistryVersionListOptions) (RegistryRecordVersionPage, error) {
+	out, err := c.service.ListRegistryRecordVersions(ctx, registryID, recordID, controlplane.RegistryRecordListRequest{Offset: opts.Offset, Limit: opts.Limit, Filters: controlRegistryFilters(opts.Filters)})
+	if err != nil {
+		return RegistryRecordVersionPage{}, withResourceError(normalizeError("Registries.Records.ListVersions", err), "registry_record", recordID)
+	}
+	page := RegistryRecordVersionPage{Items: make([]RegistryRecordVersionInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, registryVersionInfoFrom(item, ""))
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func (c *controlAdapter) DecideRegistryRecord(ctx context.Context, decision, registryID, recordID, versionID, comment string) (RegistryRecordVersionInfo, error) {
+	out, requestID, err := c.service.DecideRegistryRecord(ctx, decision, registryID, recordID, versionID, comment)
+	if err != nil {
+		return RegistryRecordVersionInfo{}, withResourceError(normalizeError("Registries.Records."+decision, err), "registry_record", recordID)
+	}
+	return registryVersionInfoFrom(out, requestID), nil
+}
+
+func (c *controlAdapter) PreviewRegistryRecord(ctx context.Context, registryID, recordID string, selector *RegistryVersionSelector) (RegistryPreviewInfo, error) {
+	out, err := c.service.PreviewRegistryRecord(ctx, registryID, recordID, controlRegistrySelector(selector))
+	if err != nil {
+		return RegistryPreviewInfo{}, withResourceError(normalizeError("Registries.Records.Preview", err), "registry_record", recordID)
+	}
+	return RegistryPreviewInfo{Result: append(json.RawMessage(nil), out.Result...), ResolvedVersionID: out.ResolvedVersionID, RequestID: out.RequestID}, nil
+}
+
+func (c *controlAdapter) SyncRegistryRecord(ctx context.Context, registryID, recordID string, selector *RegistryVersionSelector, changeLog string) (RegistrySyncResult, error) {
+	out, err := c.service.SyncRegistryRecord(ctx, registryID, recordID, controlRegistrySelector(selector), changeLog)
+	if err != nil {
+		return RegistrySyncResult{}, withResourceError(normalizeError("Registries.Records.Sync", err), "registry_record", recordID)
+	}
+	result := RegistrySyncResult{Status: RegistrySyncStatus(out.Status), ResolvedVersionID: out.ResolvedVersionID, LastSyncAt: out.LastSyncAt, ErrorCode: out.ErrorCode, ErrorMessage: out.ErrorMessage, RequestID: out.RequestID}
+	if out.CreatedVersion != nil {
+		value := registryVersionInfoFrom(*out.CreatedVersion, out.RequestID)
+		result.CreatedVersion = &value
+	}
+	if out.Record != nil {
+		value := registryRecordInfoFrom(*out.Record, out.RequestID)
+		result.Record = &value
+	}
+	return result, nil
+}
+
+func (c *controlAdapter) ListRegistryAuditLogs(ctx context.Context, registryID string, opts RegistryAuditLogListOptions) (RegistryAuditLogPage, error) {
+	in := controlplane.RegistryAuditLogRequest{RecordID: opts.RecordID, VersionID: opts.VersionID, Action: opts.Action, Actor: opts.Actor, Start: opts.Start, End: opts.End, Offset: opts.Offset, Limit: opts.Limit}
+	out, err := c.service.ListRegistryAuditLogs(ctx, registryID, in)
+	if err != nil {
+		return RegistryAuditLogPage{}, withResourceError(normalizeError("Registries.Records.ListAuditLogs", err), "registry", registryID)
+	}
+	page := RegistryAuditLogPage{Items: make([]RegistryAuditLogInfo, 0, len(out.Items)), TotalCount: out.TotalCount, RequestID: out.RequestID}
+	for _, item := range out.Items {
+		page.Items = append(page.Items, RegistryAuditLogInfo{ID: item.ID, RegistryID: item.RegistryID, RecordID: item.RecordID, VersionID: item.VersionID, Actor: item.Actor, Action: item.Action, Details: append(json.RawMessage(nil), item.Details...), CreatedAt: item.CreatedAt})
+	}
+	next := opts.Offset + len(page.Items)
+	if int64(next) < page.TotalCount {
+		page.NextOffset = &next
+	}
+	return page, nil
+}
+
+func controlRegistryTags(values []RegistryTag) []controlplane.RegistryTag {
+	out := make([]controlplane.RegistryTag, len(values))
+	for i, v := range values {
+		out[i] = controlplane.RegistryTag{Key: v.Key, Value: v.Value}
+	}
+	return out
+}
+func controlRegistryFilters(values []RegistryFilter) []controlplane.RegistryFilter {
+	out := make([]controlplane.RegistryFilter, len(values))
+	for i, v := range values {
+		out[i] = controlplane.RegistryFilter{Name: v.Name, Values: append([]string(nil), v.Values...)}
+	}
+	return out
+}
+func controlRegistryMCPSource(value *RegistryMCPSource) *controlplane.RegistrySource {
+	if value == nil {
+		return nil
+	}
+	return &controlplane.RegistrySource{Type: string(value.Type), Descriptors: append(json.RawMessage(nil), value.Descriptors...), EndpointURL: value.EndpointURL}
+}
+func controlRegistryAgentSource(value *RegistryAgentSource) *controlplane.RegistrySource {
+	if value == nil {
+		return nil
+	}
+	return &controlplane.RegistrySource{Type: string(value.Type), Descriptors: append(json.RawMessage(nil), value.Descriptors...), EndpointURL: value.EndpointURL}
+}
+func controlRegistrySkillSource(value *RegistrySkillSource) *controlplane.RegistrySkillSource {
+	if value == nil {
+		return nil
+	}
+	return &controlplane.RegistrySkillSource{Type: string(value.Type), SkillMD: value.SkillMD}
+}
+func controlRegistrySelector(value *RegistryVersionSelector) *controlplane.RegistrySelector {
+	if value == nil {
+		return nil
+	}
+	return &controlplane.RegistrySelector{VersionID: value.VersionID, Label: value.Label}
+}
+func registryInfoFrom(value controlplane.RegistryResult) RegistryInfo {
+	in := value.Registry
+	out := RegistryInfo{ID: in.ID, Name: in.Name, Description: in.Description, Region: in.Region, ApprovalMode: RegistryApprovalMode(in.ApprovalMode), Status: RegistryStatus(in.Status), CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt, RecordCount: in.RecordCount, PublishedRecordCount: in.PublishedRecordCount, AppID: in.AppID, CreatorUIN: in.CreatorUIN, CreatorSubUIN: in.CreatorSubUIN, Tags: make([]RegistryTag, len(in.Tags)), RequestID: value.RequestID}
+	for i, tag := range in.Tags {
+		out.Tags[i] = RegistryTag{Key: tag.Key, Value: tag.Value}
+	}
+	return out
+}
+func registryRecordInfoFrom(in controlplane.RegistryRecord, requestID string) RegistryRecordInfo {
+	return RegistryRecordInfo{ID: in.ID, RegistryID: in.RegistryID, Name: in.Name, Description: in.Description, DescriptorType: RegistryDescriptorType(in.DescriptorType), Status: RegistryRecordStatus(in.Status), AppID: in.AppID, CreatorUIN: in.CreatorUIN, CreatorSubUIN: in.CreatorSubUIN, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt, VersionCount: in.VersionCount, Labels: append([]string(nil), in.Labels...), RequestID: requestID}
+}
+func registryVersionInfoFrom(in controlplane.RegistryRecordVersion, requestID string) RegistryRecordVersionInfo {
+	out := RegistryRecordVersionInfo{ID: in.ID, RecordID: in.RecordID, Revision: in.Revision, Status: RegistryVersionStatus(in.Status), ApprovalMode: RegistryApprovalMode(in.ApprovalMode), AppID: in.AppID, CreatorUIN: in.CreatorUIN, CreatorSubUIN: in.CreatorSubUIN, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt, Name: in.Name, Descriptors: append(json.RawMessage(nil), in.Descriptors...), SourceConfig: append(json.RawMessage(nil), in.SourceConfig...), SourceType: RegistrySourceType(in.SourceType), ContentStatus: in.ContentStatus, ContentSHA256: in.ContentSHA256, ContentSizeBytes: in.ContentSizeBytes, ConfigSHA256: in.ConfigSHA256, ChangeLog: in.ChangeLog, ContentReadyAt: in.ContentReadyAt, Labels: append([]string(nil), in.Labels...), RequestID: requestID, ApprovalActions: make([]RegistryApprovalAction, len(in.ApprovalActions))}
+	for i, item := range in.ApprovalActions {
+		out.ApprovalActions[i] = RegistryApprovalAction{ID: item.ID, Type: item.Type, ActorType: item.ActorType, ActorUIN: item.ActorUIN, ActorSubUIN: item.ActorSubUIN, Comment: item.Comment, RequestID: item.RequestID, CreatedAt: item.CreatedAt}
+	}
+	return out
+}
+func registryRecordResultFrom(value controlplane.RegistryRecordResult) RegistryRecordResult {
+	out := RegistryRecordResult{Record: registryRecordInfoFrom(value.Record, value.RequestID), ResolvedBy: value.ResolvedBy, ResolvedLabel: value.ResolvedLabel, RequestID: value.RequestID}
+	if value.Version != nil {
+		version := registryVersionInfoFrom(*value.Version, value.RequestID)
+		out.Version = &version
+	}
+	return out
+}
+
 func (c *controlAdapter) acquireDeploymentToken(ctx context.Context, id string) (deploymentAccess, error) {
 	out, err := c.service.AcquireDeploymentToken(ctx, id)
 	if err != nil {
@@ -644,6 +873,17 @@ func controlUpdateVolume(value UpdateVolumeOptions) controlplane.UpdateVolumeReq
 		out.Tags = &tags
 	}
 	return out
+}
+
+func controlVolumeTarget(value volumeTarget) controlplane.VolumeTarget {
+	return controlplane.VolumeTarget{ID: value.id, Name: value.name}
+}
+
+func volumeTargetLabel(value volumeTarget) string {
+	if value.id != "" {
+		return value.id
+	}
+	return value.name
 }
 
 func controlUpdateVolumeTemplate(value UpdateVolumeTemplateOptions) controlplane.UpdateVolumeTemplateRequest {

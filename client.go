@@ -105,6 +105,7 @@ type Client struct {
 	volumeTemplates *VolumeTemplateManager
 	sessionSpaces   *SessionSpaceManager
 	sessions        *SessionManager
+	registries      *RegistryManager
 }
 
 // Sandboxes returns the sandbox control service bound to this client's Cloud identity.
@@ -130,6 +131,9 @@ func (c *Client) SessionSpaces() *SessionSpaceManager { return c.sessionSpaces }
 
 // Sessions returns the Preview Session and Event service.
 func (c *Client) Sessions() *SessionManager { return c.sessions }
+
+// Registries returns the Preview Registry service.
+func (c *Client) Registries() *RegistryManager { return c.registries }
 
 // NewClient constructs a client without creating a sandbox. Region defaults from
 // TENCENTCLOUD_REGION; request timeout defaults to 30 seconds. Explicit control credentials
@@ -175,6 +179,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	out.volumeTemplates = &VolumeTemplateManager{client: out}
 	out.sessionSpaces = &SessionSpaceManager{client: out}
 	out.sessions = &SessionManager{client: out}
+	out.registries = &RegistryManager{client: out}
 	return out, nil
 }
 

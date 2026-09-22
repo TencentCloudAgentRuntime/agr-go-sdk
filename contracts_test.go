@@ -94,7 +94,7 @@ func TestCommonControlPlaneCallsStayInsideActionContract(t *testing.T) {
 	}
 	used := map[string]bool{}
 	pattern := regexp.MustCompile(`commonCall\(ctx,\s*"([A-Z][A-Za-z0-9]+)"`)
-	for _, path := range []string{"internal/controlplane/volumes.go", "internal/controlplane/sessions.go"} {
+	for _, path := range []string{"internal/controlplane/volumes.go", "internal/controlplane/sessions.go", "internal/controlplane/registries.go"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

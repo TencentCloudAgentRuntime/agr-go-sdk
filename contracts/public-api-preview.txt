@@ -77,6 +77,9 @@ func (c *Client) PreCacheImages() *PreCacheImageManager
     PreCacheImages returns the image pre-cache service bound to this client's
     Cloud identity.
 
+func (c *Client) Registries() *RegistryManager
+    Registries returns the Preview Registry service.
+
 func (c *Client) Sandboxes() *SandboxManager
     Sandboxes returns the sandbox control service bound to this client's Cloud
     identity.
@@ -508,6 +511,38 @@ type CreatePreCacheImageOptions struct {
 }
     CreatePreCacheImageOptions starts image pre-caching.
 
+type CreateRegistryOptions struct {
+	// Name is unique within one account and region.
+	Name string
+	// Description is optional display text.
+	Description string
+	// ApprovalMode defaults to AUTO when empty.
+	ApprovalMode RegistryApprovalMode
+	// Tags are attached during creation.
+	Tags []RegistryTag
+}
+    CreateRegistryOptions creates one Registry.
+
+type CreateRegistryRecordOptions struct {
+	// Name is unique among active Records in the Registry.
+	Name string
+	// Description is optional Record display text.
+	Description string
+	// VersionName is an optional name for revision one.
+	VersionName string
+	// DescriptorType selects exactly one matching source field.
+	DescriptorType RegistryDescriptorType
+	// MCPSource is valid only for MCP Records.
+	MCPSource *RegistryMCPSource
+	// AgentSource is valid only for A2A or AGUI Records.
+	AgentSource *RegistryAgentSource
+	// SkillSource is valid only for AGENT_SKILLS Records.
+	SkillSource *RegistrySkillSource
+	// CustomDescriptors is a bounded JSON object for CUSTOM Records.
+	CustomDescriptors json.RawMessage
+}
+    CreateRegistryRecordOptions creates a Record and its first Version.
+
 type CreateSessionOptions struct {
 	// Ref supplies SpaceID and UserID; SessionID may be empty.
 	Ref SessionRef
@@ -632,6 +667,16 @@ type CredentialProvider interface {
     Implementations must support concurrent calls and honor cancellation.
     Refreshing providers own their caching policy; the SDK never caches the
     returned secret.
+
+type DeleteRegistryRecordOptions struct {
+	// Version selects a single Version; nil selects the whole Record.
+	Version *RegistryVersionSelector
+	// Reason is required when deleting a Version.
+	Reason string
+}
+    DeleteRegistryRecordOptions deletes the whole Record when Version is nil.
+    A non-nil Version must contain VersionID only; an explicitly empty selector
+    is rejected locally.
 
 type DeploymentAffinity struct {
 	// Mode selects affinity behavior; an empty value disables affinity.
@@ -1554,6 +1599,499 @@ type ReadOptions struct {
 	User SandboxUser
 }
     ReadOptions selects the logical runtime user for a streamed read.
+
+type RegistryAgentSource struct {
+	// Type selects MANUAL or URL_IMPORT.
+	Type RegistrySourceType
+	// Descriptors is a bounded JSON object for MANUAL.
+	Descriptors json.RawMessage
+	// EndpointURL is an explicit HTTPS endpoint for URL_IMPORT.
+	EndpointURL string
+}
+    RegistryAgentSource supplies A2A or AG-UI descriptor content or an import
+    endpoint.
+
+type RegistryApprovalAction struct {
+	// ID is the decision identity.
+	ID string
+	// Type preserves the service action type.
+	Type string
+	// ActorType preserves the service actor category.
+	ActorType string
+	// ActorUIN is the actor's primary account identity.
+	ActorUIN string
+	// ActorSubUIN is the actor's sub-account identity.
+	ActorSubUIN string
+	// Comment is the decision comment.
+	Comment string
+	// RequestID correlates the original decision request when reported.
+	RequestID string
+	// CreatedAt is the decision timestamp.
+	CreatedAt time.Time
+}
+    RegistryApprovalAction is one immutable Version decision entry.
+
+type RegistryApprovalMode string
+    RegistryApprovalMode controls whether new Record versions require an
+    explicit decision.
+
+const (
+	// RegistryApprovalAuto approves new versions automatically.
+	RegistryApprovalAuto RegistryApprovalMode = "AUTO"
+	// RegistryApprovalManual leaves new versions pending approval.
+	RegistryApprovalManual RegistryApprovalMode = "MANUAL"
+)
+type RegistryAuditLogInfo struct {
+	// ID is the audit entry identity.
+	ID string
+	// RegistryID identifies the owning Registry.
+	RegistryID string
+	// RecordID identifies the related Record when present.
+	RecordID string
+	// VersionID identifies the related Version when present.
+	VersionID string
+	// Actor is the account identity that initiated the action.
+	Actor string
+	// Action is the recorded service action.
+	Action string
+	// Details is a bounded, redacted JSON object.
+	Details json.RawMessage
+	// CreatedAt is the action timestamp.
+	CreatedAt time.Time
+}
+    RegistryAuditLogInfo is one immutable, redacted service audit entry.
+
+type RegistryAuditLogListOptions struct {
+	// RecordID optionally narrows the query to one Record.
+	RecordID string
+	// VersionID optionally narrows the query to one Version.
+	VersionID string
+	// Action selects one exact service action.
+	Action string
+	// Actor selects one exact account actor.
+	Actor string
+	// Start is the optional inclusive window start.
+	Start *time.Time
+	// End is the optional window end.
+	End *time.Time
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+}
+    RegistryAuditLogListOptions filters Registry audit entries.
+
+type RegistryAuditLogPage struct {
+	// Items contains audit snapshots.
+	Items []RegistryAuditLogInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryAuditLogPage is one service-reported audit page.
+
+type RegistryDescriptorType string
+    RegistryDescriptorType selects the protocol represented by a Record.
+
+const (
+	// RegistryDescriptorMCP represents an MCP server descriptor.
+	RegistryDescriptorMCP RegistryDescriptorType = "MCP"
+	// RegistryDescriptorA2A represents an A2A Agent Card.
+	RegistryDescriptorA2A RegistryDescriptorType = "A2A"
+	// RegistryDescriptorAGUI represents an AG-UI endpoint descriptor.
+	RegistryDescriptorAGUI RegistryDescriptorType = "AGUI"
+	// RegistryDescriptorCustom represents a caller-defined JSON descriptor.
+	RegistryDescriptorCustom RegistryDescriptorType = "CUSTOM"
+	// RegistryDescriptorAgentSkills represents an inline SKILL.md descriptor.
+	RegistryDescriptorAgentSkills RegistryDescriptorType = "AGENT_SKILLS"
+)
+type RegistryFilter struct {
+	// Name selects a reviewed service field.
+	Name string
+	// Values are ORed within the filter.
+	Values []string
+}
+    RegistryFilter is one reviewed server-side filter.
+
+type RegistryInfo struct {
+	// ID is the service-generated Registry identity.
+	ID string
+	// Name is the Registry name.
+	Name string
+	// Description is the current description.
+	Description string
+	// Region is the service region containing the Registry.
+	Region string
+	// ApprovalMode is fixed when the Registry is created.
+	ApprovalMode RegistryApprovalMode
+	// Status preserves known and future service values.
+	Status RegistryStatus
+	// CreatedAt is the creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the last update timestamp.
+	UpdatedAt time.Time
+	// RecordCount is the number of active Records.
+	RecordCount int64
+	// PublishedRecordCount is present when reported by the service.
+	PublishedRecordCount *int64
+	// AppID is present when reported by the service.
+	AppID *int64
+	// CreatorUIN is the creator's primary account identity.
+	CreatorUIN string
+	// CreatorSubUIN is the creator's sub-account identity.
+	CreatorSubUIN string
+	// Tags contains authoritative Cloud tags.
+	Tags []RegistryTag
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryInfo is an immutable Registry snapshot.
+
+type RegistryLabelMutation struct {
+	// Operation selects SET or DELETE.
+	Operation RegistryLabelOperation
+	// Name is the normalized label name.
+	Name string
+	// VersionID is optional for SET and forbidden for DELETE.
+	VersionID *string
+	// Reason is optional mutation context.
+	Reason string
+}
+    RegistryLabelMutation mutates one label while preserving optional VersionID
+    presence.
+
+type RegistryLabelOperation string
+    RegistryLabelOperation selects a label mutation.
+
+const (
+	// RegistryLabelSet creates, binds, or moves a label.
+	RegistryLabelSet RegistryLabelOperation = "SET"
+	// RegistryLabelDelete deletes a custom label.
+	RegistryLabelDelete RegistryLabelOperation = "DELETE"
+)
+type RegistryListOptions struct {
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+	// Filters are evaluated by the service.
+	Filters []RegistryFilter
+}
+    RegistryListOptions selects one Registry offset page.
+
+type RegistryMCPSource struct {
+	// Type selects MANUAL or URL_IMPORT.
+	Type RegistrySourceType
+	// Descriptors is a bounded JSON object for MANUAL.
+	Descriptors json.RawMessage
+	// EndpointURL is an explicit HTTPS endpoint for URL_IMPORT.
+	EndpointURL string
+}
+    RegistryMCPSource supplies MCP descriptor content or an import endpoint.
+
+type RegistryManager struct {
+	// Has unexported fields.
+}
+    RegistryManager manages Preview Registry resources.
+
+func (m *RegistryManager) Create(ctx context.Context, opts CreateRegistryOptions) (RegistryInfo, error)
+    Create creates one Registry.
+
+func (m *RegistryManager) Delete(ctx context.Context, id string) error
+    Delete deletes an empty Registry.
+
+func (m *RegistryManager) Get(ctx context.Context, id string) (RegistryInfo, error)
+    Get returns one Registry by ID.
+
+func (m *RegistryManager) List(ctx context.Context, opts RegistryListOptions) (RegistryPage, error)
+    List returns one server-filtered Registry page.
+
+func (m *RegistryManager) Records(registryID string) *RegistryRecordManager
+    Records returns a Record manager bound to registryID. Methods reject an
+    empty ID locally.
+
+func (m *RegistryManager) Update(ctx context.Context, id string, opts UpdateRegistryOptions) (RegistryInfo, error)
+    Update replaces one Registry description, including an explicit empty value.
+
+type RegistryPage struct {
+	// Items contains Registry snapshots.
+	Items []RegistryInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryPage is one service-reported Registry page.
+
+type RegistryPreviewInfo struct {
+	// Result is the bounded preview JSON object.
+	Result json.RawMessage
+	// ResolvedVersionID is the Version inspected by the service.
+	ResolvedVersionID string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryPreviewInfo is a bounded, read-only remote preview result.
+
+type RegistryRecordInfo struct {
+	// ID is the service-generated Record identity.
+	ID string
+	// RegistryID identifies the owning Registry.
+	RegistryID string
+	// Name is the Record name.
+	Name string
+	// Description is the Record description.
+	Description string
+	// DescriptorType is fixed at creation.
+	DescriptorType RegistryDescriptorType
+	// Status preserves known and future service values.
+	Status RegistryRecordStatus
+	// AppID is the owning account identity.
+	AppID int64
+	// CreatorUIN is the creator's primary account identity.
+	CreatorUIN string
+	// CreatorSubUIN is the creator's sub-account identity.
+	CreatorSubUIN string
+	// CreatedAt is the creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the last update timestamp.
+	UpdatedAt time.Time
+	// VersionCount is present when reported by the service.
+	VersionCount *int64
+	// Labels contains all label names known to the Record.
+	Labels []string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryRecordInfo is immutable Record metadata.
+
+type RegistryRecordListOptions struct {
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+	// Filters are evaluated by the service.
+	Filters []RegistryFilter
+}
+    RegistryRecordListOptions selects one Record offset page.
+
+type RegistryRecordManager struct {
+	// Has unexported fields.
+}
+    RegistryRecordManager manages Records bound to exactly one Registry.
+
+func (m *RegistryRecordManager) Approve(ctx context.Context, recordID, versionID, comment string) (RegistryRecordVersionInfo, error)
+    Approve approves one pending Version.
+
+func (m *RegistryRecordManager) Cancel(ctx context.Context, recordID, versionID, comment string) (RegistryRecordVersionInfo, error)
+    Cancel cancels one pending Version.
+
+func (m *RegistryRecordManager) Create(ctx context.Context, opts CreateRegistryRecordOptions) (RegistryRecordResult, error)
+    Create creates a Record and its first Version.
+
+func (m *RegistryRecordManager) Delete(ctx context.Context, recordID string, opts DeleteRegistryRecordOptions) error
+    Delete deletes the Record when Version is nil or exactly one Version when
+    supplied.
+
+func (m *RegistryRecordManager) Get(ctx context.Context, recordID string, selector *RegistryVersionSelector) (RegistryRecordResult, error)
+    Get returns a Record and one resolved Version. Nil selector means stable.
+
+func (m *RegistryRecordManager) List(ctx context.Context, opts RegistryRecordListOptions) (RegistryRecordPage, error)
+    List returns one server-filtered Record page within this Registry.
+
+func (m *RegistryRecordManager) ListAuditLogs(ctx context.Context, opts RegistryAuditLogListOptions) (RegistryAuditLogPage, error)
+    ListAuditLogs returns one Registry audit page.
+
+func (m *RegistryRecordManager) ListVersions(ctx context.Context, recordID string, opts RegistryVersionListOptions) (RegistryRecordVersionPage, error)
+    ListVersions returns one Version page for recordID.
+
+func (m *RegistryRecordManager) Preview(ctx context.Context, recordID string, selector *RegistryVersionSelector) (RegistryPreviewInfo, error)
+    Preview performs one explicit read-only remote metadata preview.
+
+func (m *RegistryRecordManager) Reject(ctx context.Context, recordID, versionID, comment string) (RegistryRecordVersionInfo, error)
+    Reject rejects one pending Version.
+
+func (m *RegistryRecordManager) Sync(ctx context.Context, recordID string, selector *RegistryVersionSelector, changeLog string) (RegistrySyncResult, error)
+    Sync performs one explicit remote synchronization mutation without automatic
+    retry.
+
+func (m *RegistryRecordManager) Update(ctx context.Context, recordID string, opts UpdateRegistryRecordOptions) (RegistryRecordResult, error)
+    Update changes Record metadata/labels or creates one new Version without
+    automatic retry.
+
+type RegistryRecordPage struct {
+	// Items contains Record snapshots.
+	Items []RegistryRecordInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryRecordPage is one service-reported Record page.
+
+type RegistryRecordResult struct {
+	// Record is the current Record metadata.
+	Record RegistryRecordInfo
+	// Version is present for reads and Version creation; metadata-only updates leave it nil.
+	Version *RegistryRecordVersionInfo
+	// ResolvedBy preserves the service resolution mode.
+	ResolvedBy string
+	// ResolvedLabel contains the selected label when applicable.
+	ResolvedLabel string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryRecordResult combines Record metadata and its resolved or newly
+    created Version.
+
+type RegistryRecordStatus string
+    RegistryRecordStatus preserves service-defined Record lifecycle values.
+
+type RegistryRecordVersionInfo struct {
+	// ID is the Version identity.
+	ID string
+	// RecordID identifies the owning Record.
+	RecordID string
+	// Revision is the monotonic Record revision.
+	Revision int64
+	// Status preserves known and future Version states.
+	Status RegistryVersionStatus
+	// ApprovalMode is the mode captured when this Version was created.
+	ApprovalMode RegistryApprovalMode
+	// AppID is the owning account identity.
+	AppID int64
+	// CreatorUIN is the creator's primary account identity.
+	CreatorUIN string
+	// CreatorSubUIN is the creator's sub-account identity.
+	CreatorSubUIN string
+	// CreatedAt is the creation timestamp.
+	CreatedAt time.Time
+	// UpdatedAt is the last update timestamp.
+	UpdatedAt time.Time
+	// Name is the optional Version display name.
+	Name string
+	// Descriptors is a bounded JSON object.
+	Descriptors json.RawMessage
+	// SourceConfig is a bounded normalized source JSON object.
+	SourceConfig json.RawMessage
+	// SourceType preserves the service source type.
+	SourceType RegistrySourceType
+	// ContentStatus preserves the package content state when present.
+	ContentStatus string
+	// ContentSHA256 is the ready content digest when present.
+	ContentSHA256 string
+	// ContentSizeBytes is present when reported by the service.
+	ContentSizeBytes *int64
+	// ConfigSHA256 is the normalized configuration digest.
+	ConfigSHA256 string
+	// ChangeLog is the immutable Version change description.
+	ChangeLog string
+	// ContentReadyAt is the package readiness timestamp when present.
+	ContentReadyAt time.Time
+	// ApprovalActions contains the decision history.
+	ApprovalActions []RegistryApprovalAction
+	// Labels contains labels currently bound to this Version.
+	Labels []string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryRecordVersionInfo is an immutable Version snapshot.
+
+type RegistryRecordVersionPage struct {
+	// Items contains Version snapshots.
+	Items []RegistryRecordVersionInfo
+	// TotalCount is the service count for the query.
+	TotalCount int64
+	// NextOffset is nil when no continuation is reported.
+	NextOffset *int
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistryRecordVersionPage is one service-reported Version page.
+
+type RegistrySkillSource struct {
+	// Type must be MANUAL in A5a.
+	Type RegistrySourceType
+	// SkillMD contains bounded inline SKILL.md text.
+	SkillMD string
+}
+    RegistrySkillSource supplies inline SKILL.md content. Package transfer is
+    not in A5a.
+
+type RegistrySourceType string
+    RegistrySourceType identifies how descriptor content is supplied.
+
+const (
+	// RegistrySourceManual sends descriptor content directly.
+	RegistrySourceManual RegistrySourceType = "MANUAL"
+	// RegistrySourceURLImport asks the service to import an explicit HTTPS endpoint.
+	RegistrySourceURLImport RegistrySourceType = "URL_IMPORT"
+	// RegistrySourceTarPackage is reserved for the separately released package-transfer API.
+	RegistrySourceTarPackage RegistrySourceType = "TAR_PACKAGE"
+)
+type RegistryStatus string
+    RegistryStatus preserves service-defined Registry lifecycle values.
+
+type RegistrySyncResult struct {
+	// Status preserves the service synchronization outcome.
+	Status RegistrySyncStatus
+	// ResolvedVersionID is the Version used as the synchronization source.
+	ResolvedVersionID string
+	// CreatedVersion is present when synchronization created a Version.
+	CreatedVersion *RegistryRecordVersionInfo
+	// Record is present when synchronization changed the Record.
+	Record *RegistryRecordInfo
+	// LastSyncAt is the service synchronization timestamp when present.
+	LastSyncAt time.Time
+	// ErrorCode is populated for a FAILED service outcome.
+	ErrorCode string
+	// ErrorMessage is populated for a FAILED service outcome.
+	ErrorMessage string
+	// RequestID is service correlation data.
+	RequestID string
+}
+    RegistrySyncResult describes an explicit remote synchronization mutation.
+
+type RegistrySyncStatus string
+    RegistrySyncStatus preserves service-defined remote synchronization
+    outcomes.
+
+type RegistryTag struct {
+	// Key is the tag key.
+	Key string
+	// Value is the tag value.
+	Value string
+}
+    RegistryTag is one Tencent Cloud Registry tag.
+
+type RegistryVersionListOptions struct {
+	// Offset is the nonnegative page offset.
+	Offset int
+	// Limit defaults to 20 and must not exceed 100.
+	Limit int
+	// Filters are evaluated by the service.
+	Filters []RegistryFilter
+}
+    RegistryVersionListOptions selects one Version offset page.
+
+type RegistryVersionSelector struct {
+	// VersionID selects one exact Version.
+	VersionID string
+	// Label selects the Version currently bound to one label.
+	Label string
+}
+    RegistryVersionSelector resolves one Version. VersionID and Label are
+    mutually exclusive. A nil selector means the service default stable label.
+
+type RegistryVersionStatus string
+    RegistryVersionStatus preserves service-defined Version states.
 
 type RemoveOptions struct {
 	// User selects the logical runtime account; empty defaults to User.
@@ -2521,6 +3059,34 @@ type UpdateOptions struct {
 }
     UpdateOptions changes lifetime and upserts metadata. Empty fields are
     omitted. Metadata updates require a single writer per remote instance.
+
+type UpdateRegistryOptions struct {
+	// Description is the complete replacement and may be empty.
+	Description string
+}
+    UpdateRegistryOptions replaces the Registry description. Empty clears it.
+
+type UpdateRegistryRecordOptions struct {
+	// Description preserves omission versus explicit clearing.
+	Description *string
+	// LabelMutations contains at most 32 unique label operations.
+	LabelMutations []RegistryLabelMutation
+	// VersionName names a newly created Version.
+	VersionName string
+	// ChangeLog describes a newly created Version.
+	ChangeLog string
+	// MCPSource creates a new MCP Version.
+	MCPSource *RegistryMCPSource
+	// AgentSource creates a new A2A or AGUI Version.
+	AgentSource *RegistryAgentSource
+	// SkillSource creates a new inline Skill Version.
+	SkillSource *RegistrySkillSource
+	// CustomDescriptors creates a new CUSTOM Version.
+	CustomDescriptors json.RawMessage
+}
+    UpdateRegistryRecordOptions either updates Record metadata/labels or creates
+    a Version. Metadata fields and Version source fields cannot be combined in
+    one call.
 
 type UpdateResult struct {
 	// InstanceID identifies the sandbox whose mutation was acknowledged.

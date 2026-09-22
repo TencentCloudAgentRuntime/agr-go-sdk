@@ -64,7 +64,7 @@ func architectureBoundaryFailures(root string) []string {
 		"client.go": true, "cloud.go": true, "code.go": true,
 		"commands.go": true, "credentials.go": true, "doc.go": true,
 		"errors.go": true, "files.go": true, "metrics.go": true,
-		"sandbox.go": true, "sandbox_update.go": true, "sessions.go": true, "tools.go": true,
+		"registries.go": true, "sandbox.go": true, "sandbox_update.go": true, "sessions.go": true, "tools.go": true,
 		"types.go": true,
 	}
 	forbiddenRootPatterns := []*regexp.Regexp{

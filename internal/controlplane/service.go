@@ -376,7 +376,7 @@ func cloudError(err error, operation string) error {
 			code, reason, retryable = model.Conflict, "RESOURCE_CONFLICT", false
 		case strings.Contains(value, "limitexceeded") || strings.Contains(value, "requestlimit"):
 			code, reason = model.ResourceExhausted, "REQUEST_LIMIT_EXCEEDED"
-		case strings.Contains(value, "invalidparameter") || strings.Contains(value, "missingparameter"):
+		case strings.Contains(value, "invalidparameter") || strings.Contains(value, "missingparameter") || strings.Contains(value, "unknownparameter"):
 			code, reason, retryable = model.InvalidArgument, "CLOUD_INVALID_ARGUMENT", false
 		case strings.Contains(value, "unsupportedregion"):
 			code, reason, retryable = model.InvalidArgument, "CLOUD_UNSUPPORTED_REGION", false
