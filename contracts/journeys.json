@@ -12,6 +12,7 @@
     {"id": "pre-cache-image", "entry": "Client.PreCacheImages", "capabilities": ["create", "get", "image_digest_reference"]},
     {"id": "persistent-volume", "entry": "Client.Volumes", "capabilities": ["volume_crud", "volume_template_crud", "tool_volume_mount", "tool_volume_template_mount", "sandbox_persistence", "explicit_cleanup"]},
     {"id": "session-events", "entry": "Client.SessionSpaces", "capabilities": ["space_crud", "session_crud", "state", "structured_events", "filters", "isolation", "explicit_cleanup"]},
-    {"id": "registry-versions", "entry": "Client.Registries", "capabilities": ["registry_crud", "record_crud", "version_decisions", "labels", "audit_logs", "preview_sync", "explicit_cleanup"]}
+    {"id": "registry-versions", "entry": "Client.Registries", "capabilities": ["registry_crud", "record_crud", "version_decisions", "labels", "audit_logs", "preview_sync", "explicit_cleanup"]},
+    {"id": "registry-skill-package", "entry": "Client.Registries", "capabilities": ["tar_package", "bounded_upload", "content_ready", "bounded_download", "sha256_verification", "explicit_cleanup"]}
   ]
 }

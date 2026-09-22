@@ -6,7 +6,7 @@
 一级资源的产品入口。当前版本提供受管理的 `Sandbox` 生命周期和数据面操作、Deployment
 控制面与 HTTP/SSE/WebSocket 连接、稳定的 Tool 管理能力，以及镜像预热任务。
 Preview 预发布版本还提供 Volume、VolumeTemplate、SessionSpace、Session、Event 以及
-Registry/Record/Version 元数据接口，并支持 Tool 持久卷挂载。
+Registry/Record/Version 接口、受管理的 Skill 包传输和 Tool 持久卷挂载。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
 [从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
@@ -164,10 +164,11 @@ SDK 不重试 AppendEvent。完整流程见
 Preview 版本还提供 `client.Registries()`。Record 必须通过
 `client.Registries().Records(registryID)` 绑定明确的 Registry，不存在隐式默认 Registry。
 Version ID 与 Label 使用互斥选择器。描述符和审计 JSON 会被复制并限制在 1 MiB 内。
-`Preview` 是只读操作，`Sync` 是显式 mutation，SDK 不自动重试。A5a 支持 CUSTOM、
-MCP/A2A/AG-UI 的 MANUAL 或 URL_IMPORT，以及内联 Skill 文本；不暴露 `TAR_PACKAGE`、
-预签名包 URL、上传和下载。完整流程见
-[Registry Cookbook](examples/cookbook/11_registry_records/main.go)。
+`Preview` 是只读操作，`Sync` 是显式 mutation，SDK 不自动重试。Registry 支持 CUSTOM、
+MCP/A2A/AG-UI 的 MANUAL 或 URL_IMPORT、内联 Skill 文本和 `TAR_PACKAGE`。Skill 包通过
+有界流式接口上传和下载，并在本地校验 SHA-256；短期预签名 URL 始终留在 SDK 内部，SDK
+不会解压下载内容。完整流程见 [Registry 元数据 Cookbook](examples/cookbook/11_registry_records/main.go)
+和 [Skill 包 Cookbook](examples/cookbook/12_registry_skill_package/main.go)。
 
 ## 能力
 
@@ -187,7 +188,7 @@ MCP/A2A/AG-UI 的 MANUAL 或 URL_IMPORT，以及内联 Skill 文本；不暴露 
 | Preview VolumeTemplate | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`、Tool reuse-key 挂载 |
 | Preview SessionSpace | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete` |
 | Preview Session 与 Event | Session `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`；Event `AppendEvent`、`ListEvents` |
-| Preview Registry | Registry 与 Record CRUD/List、Version 审批和 Label、审计日志、显式 `Preview`/`Sync` |
+| Preview Registry | Registry 与 Record CRUD/List、Version 审批和 Label、审计日志、显式 `Preview`/`Sync`、有界 Skill 包上传下载 |
 
 ## 生命周期规则
 
@@ -207,7 +208,8 @@ MCP/A2A/AG-UI 的 MANUAL 或 URL_IMPORT，以及内联 Skill 文本；不暴露 
 - Deployment Token 按需获取并由 SDK 内部刷新和脱敏，不作为公共参数或返回值。服务返回
   401 时，SDK 将响应交给调用方并使缓存 Token 失效，不自动重放请求。
 - Registry 与 Record 是账号级控制面值对象，不需要 `Close`。删除 Registry 前应先删除其
-  Record。Registry mutation 和 `Sync` 不自动重试。
+  Record。Registry mutation、`Sync` 和 Skill 包上传不自动重试。下载失败时目标 Writer
+  可能已写入前缀；需要原子替换时应先写临时文件。
 
 Create 和 Resume 接受 30 秒至 24 小时的整秒 Timeout。Update 最低为 300 秒。Connect
 先读取实例状态：PAUSED 使用 Resume 规则，RUNNING 使用 Update 规则。SDK 会原样发送

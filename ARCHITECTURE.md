@@ -53,8 +53,11 @@ explicit and ordered Session before SessionSpace.
 The Preview Registry manager is an account-level control-plane service. A Record manager binds
 one explicit Registry ID, and Version selection is explicit and mutually exclusive by Version ID
 or label. Descriptor, source-configuration, preview, and audit JSON are bounded SDK-owned values.
-Remote `Preview` is read-only; `Sync` is a caller-requested mutation. A5a deliberately excludes
-package URLs and package transport, so pre-signed URLs cannot escape through the public model.
+Remote `Preview` is read-only; `Sync` is a caller-requested mutation and neither operation is
+implicit. Skill package transfer is a separate internal data-plane path: the public
+API accepts `io.Reader`/`io.Writer`, while short-lived pre-signed URLs stay private. Transfers are
+bounded, reject redirects, do not forward Cloud authorization, verify downloads by SHA-256, and
+never extract archives.
 
 Deployment control operations also return immutable snapshots. `DeploymentConnection` is the
 only stateful Deployment object: it binds one Deployment, region, domain, and Tool port. It owns
@@ -76,9 +79,9 @@ agr / sandbox (public facades)
         |
         +--> internal/runtime --> internal/dataplane --> internal/gen
         |
-        `--> internal/dataplane/deployment
-                    |
-                    `--> internal/model
+        +--> internal/dataplane/deployment
+        +--> internal/dataplane/registry
+        `--> internal/model
 ```
 
 - The root package owns public options, validation, stable errors, and conversion
@@ -96,6 +99,8 @@ agr / sandbox (public facades)
 - `internal/dataplane/deployment` owns the direct Deployment HTTPS and WSS transport, coalesced
   token refresh, affinity sequencing, and connection-scoped cancellation. Its WebSocket library
   type remains private.
+- `internal/dataplane/registry` owns bounded HTTPS Skill package transfer. It never stores signed
+  URLs in errors, follows no redirects, adds no Cloud authorization, and performs no extraction.
 - `internal/gen` contains generated protocol bindings. It may be consumed only by
   the data-plane implementation and protocol fixtures.
 - `internal/model` contains the smallest wire-independent DTO and error vocabulary

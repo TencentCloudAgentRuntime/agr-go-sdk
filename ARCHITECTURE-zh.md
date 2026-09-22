@@ -39,7 +39,9 @@ Session 三部分共同标识，SDK 不补全默认值。状态与 Event 中的 
 Preview Registry manager 是账号级控制面服务。Record manager 必须绑定明确的 Registry ID；
 Version 只能通过互斥的 Version ID 或 Label 选择。描述符、来源配置、Preview 结果和审计 JSON
 是有界的 SDK 自有值。远程 `Preview` 是只读操作，`Sync` 是调用方显式发起的 mutation。
-A5a 不包含包 URL 和包传输，因此预签名 URL 不会进入公共模型。
+Skill 包传输使用独立的内部数据面：公共 API 只接收 `io.Reader`/`io.Writer`，短期预签名 URL
+不进入公共模型。传输有大小上限、拒绝重定向、不转发 Cloud Authorization、下载时校验
+SHA-256，并且从不解压归档。
 
 Tool 和预热 manager 是账号级纯控制面服务。它们返回的描述、mutation 回执和任务状态是
 SDK 自有的不可变值，不是已连接 handle：没有本地 generation，也不需要 `Close`。mutation
@@ -63,9 +65,9 @@ agr / sandbox（公共 facade）
         |
         +--> internal/runtime --> internal/dataplane --> internal/gen
         |
-        `--> internal/dataplane/deployment
-                    |
-                    `--> internal/model
+        +--> internal/dataplane/deployment
+        +--> internal/dataplane/registry
+        `--> internal/model
 ```
 
 - 根包负责公共选项、参数校验、稳定错误，以及公共模型和内部 DTO 的转换。
@@ -79,6 +81,8 @@ agr / sandbox（公共 facade）
   协议解析和 start barrier。
 - `internal/dataplane/deployment` 负责 Deployment HTTPS/WSS 直连、并发 Token 刷新合并、
   affinity 顺序和连接级取消。WebSocket 依赖的类型只在内部使用。
+- `internal/dataplane/registry` 负责有界的 Skill 包 HTTPS 传输，不在错误中保存签名 URL，
+  不跟随重定向、不添加 Cloud Authorization，也不解压归档。
 - `internal/gen` 保存生成的协议绑定，只允许数据面实现和协议测试夹具引用。
 - `internal/model` 只保存多个内部层确实需要共享的最小 wire-independent DTO 和错误词汇，
   不 alias 公共类型或生成类型。

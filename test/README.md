@@ -127,7 +127,18 @@ Registry CRUD/List, Version approve/reject/cancel, stable-label readback, Versio
 logs, and explicit cleanup with NotFound confirmation. It never selects an existing Registry.
 Remote MCP/A2A Preview and Sync require a separately reviewed HTTPS fixture configured through
 `AGR_REGISTRY_FIXTURE_URL`; loopback tests prove request mapping but are not Cloud evidence.
-Skill package URLs and package transfer are outside A5a and are not exercised.
+
+The A5b Skill package journey uses the same credentials and region:
+
+```bash
+cd test
+AGS_E2E=1 go test -v -count=1 -run '^TestRegistrySkillPackageCloudJourney$' .
+```
+
+It creates only owned Registry and `TAR_PACKAGE` Record identities, streams a gzip tar upload,
+waits for `READY`, verifies service size and SHA-256, streams the exact Version back, verifies
+identical bytes, and explicitly cleans up. The SDK never exposes the pre-signed URLs and does not
+extract the archive.
 
 The explicit-client journey covers Files, streamed upload/read, Watch, Commands Run/List/Connect,
 PTY, all ten Metrics with an explicit Start/End window, Update, and Connect. A dedicated
