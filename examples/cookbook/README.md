@@ -15,6 +15,7 @@ running it. All creation examples close local resources and delete only the inst
 | Deployment control and HTTP/SSE/WebSocket data plane | [08_deployment](08_deployment/main.go) | Create, connect, delete |
 | Preview persistent Volume mounts | [09_persistent_volume](09_persistent_volume/main.go) | Volume, VolumeTemplate, Tool mount, Sandbox cleanup |
 | Preview Session state and Events | [10_session_events](10_session_events/main.go) | `session-events` |
+| Preview Registry Records and Versions | [11_registry_records](11_registry_records/main.go) | `registry-versions` |
 
 The journey IDs are machine-readable in [`contracts/journeys.json`](../../contracts/journeys.json).
 File streaming, Watch, PTY, lifecycle, and cleanup behavior are covered by the root README and
@@ -49,3 +50,9 @@ SessionSpace is the isolation boundary for Session state and Events. It is indep
 Sandbox generation, a CodeContext, and Deployment affinity: pausing or deleting a Sandbox does
 not mutate Session state. The example deletes its Session before deleting only the SessionSpace
 it created.
+
+The Registry example is available only from a Preview release. It creates a MANUAL-approval
+Registry and a CUSTOM Record, approves revision one, binds the `stable` label, reads audit logs,
+and then deletes only its own Record and Registry. MCP/A2A URL imports require an explicit HTTPS
+endpoint. Skill package upload/download and `TAR_PACKAGE` are intentionally deferred; A5a accepts
+inline `SkillMD` only and never exposes pre-signed package URLs.

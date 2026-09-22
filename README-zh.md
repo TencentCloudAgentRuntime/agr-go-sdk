@@ -5,8 +5,8 @@
 这是腾讯云 Agent Runtime（AGR）的原生 Go SDK。`Client` 是凭证、地域、传输策略和
 一级资源的产品入口。当前版本提供受管理的 `Sandbox` 生命周期和数据面操作、Deployment
 控制面与 HTTP/SSE/WebSocket 连接、稳定的 Tool 管理能力，以及镜像预热任务。
-Preview 预发布版本还提供 Volume、VolumeTemplate、SessionSpace、Session 和 Event 控制接口，
-并支持 Tool 持久卷挂载。
+Preview 预发布版本还提供 Volume、VolumeTemplate、SessionSpace、Session、Event 以及
+Registry/Record/Version 元数据接口，并支持 Tool 持久卷挂载。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
 [从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
@@ -161,6 +161,14 @@ CustomState、StateDelta、事件 Metadata、Extensions 和函数载荷必须是
 SDK 不重试 AppendEvent。完整流程见
 [Session 与 Event Cookbook](examples/cookbook/10_session_events/main.go)。
 
+Preview 版本还提供 `client.Registries()`。Record 必须通过
+`client.Registries().Records(registryID)` 绑定明确的 Registry，不存在隐式默认 Registry。
+Version ID 与 Label 使用互斥选择器。描述符和审计 JSON 会被复制并限制在 1 MiB 内。
+`Preview` 是只读操作，`Sync` 是显式 mutation，SDK 不自动重试。A5a 支持 CUSTOM、
+MCP/A2A/AG-UI 的 MANUAL 或 URL_IMPORT，以及内联 Skill 文本；不暴露 `TAR_PACKAGE`、
+预签名包 URL、上传和下载。完整流程见
+[Registry Cookbook](examples/cookbook/11_registry_records/main.go)。
+
 ## 能力
 
 | 范围 | API |
@@ -179,6 +187,7 @@ SDK 不重试 AppendEvent。完整流程见
 | Preview VolumeTemplate | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`、Tool reuse-key 挂载 |
 | Preview SessionSpace | `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete` |
 | Preview Session 与 Event | Session `Create`、精确 `Get`、偏移量 `List`、`Update`、`Delete`；Event `AppendEvent`、`ListEvents` |
+| Preview Registry | Registry 与 Record CRUD/List、Version 审批和 Label、审计日志、显式 `Preview`/`Sync` |
 
 ## 生命周期规则
 
@@ -197,6 +206,8 @@ SDK 不重试 AppendEvent。完整流程见
   Deployment。删除是异步操作，调用方应显式调用 `Delete` 和 `WaitDeleted`。
 - Deployment Token 按需获取并由 SDK 内部刷新和脱敏，不作为公共参数或返回值。服务返回
   401 时，SDK 将响应交给调用方并使缓存 Token 失效，不自动重放请求。
+- Registry 与 Record 是账号级控制面值对象，不需要 `Close`。删除 Registry 前应先删除其
+  Record。Registry mutation 和 `Sync` 不自动重试。
 
 Create 和 Resume 接受 30 秒至 24 小时的整秒 Timeout。Update 最低为 300 秒。Connect
 先读取实例状态：PAUSED 使用 Resume 规则，RUNNING 使用 Update 规则。SDK 会原样发送

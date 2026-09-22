@@ -23,7 +23,9 @@ Client
   |-- VolumeManager -> VolumeInfo
   |-- VolumeTemplateManager -> VolumeTemplateInfo
   |-- SessionSpaceManager -> SessionSpaceInfo
-  `-- SessionManager -> SessionInfo / EventInfo
+  |-- SessionManager -> SessionInfo / EventInfo
+  `-- RegistryManager -> RegistryInfo
+                         `-- RegistryRecordManager -> Record / Version / AuditLog
 ```
 
 `Client` binds one Tencent Cloud identity, region, endpoints, and request policy.
@@ -47,6 +49,12 @@ Session has an explicit Space, User, and Session identity; no component is infer
 State and Event JSON are SDK-owned bounded values. Sessions have no Sandbox generation,
 CodeContext lifetime, Deployment affinity, or local `Close` operation. Remote cleanup is always
 explicit and ordered Session before SessionSpace.
+
+The Preview Registry manager is an account-level control-plane service. A Record manager binds
+one explicit Registry ID, and Version selection is explicit and mutually exclusive by Version ID
+or label. Descriptor, source-configuration, preview, and audit JSON are bounded SDK-owned values.
+Remote `Preview` is read-only; `Sync` is a caller-requested mutation. A5a deliberately excludes
+package URLs and package transport, so pre-signed URLs cannot escape through the public model.
 
 Deployment control operations also return immutable snapshots. `DeploymentConnection` is the
 only stateful Deployment object: it binds one Deployment, region, domain, and Tool port. It owns
@@ -78,7 +86,7 @@ agr / sandbox (public facades)
 - `internal/controlplane` owns Cloud clients, signing integration, typed Action mapping,
   lifecycle polling, Metrics requests, instance-token acquisition, and construction
   of a fresh runtime generation.
-- Preview Volume and Session Actions use the official Tencent Cloud `common.CommonClient` only through a
+- Preview Volume, Session, and Registry Actions use the official Tencent Cloud `common.CommonClient` only through a
   compile-time internal allowlist because the pinned generated AGS models do not contain them.
   Existing typed Actions never fall back to this path after failure, and no raw call is public.
 - `internal/runtime` owns generation validity, request lifetimes, handles, stream

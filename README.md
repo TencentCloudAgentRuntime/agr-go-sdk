@@ -8,7 +8,7 @@ first-class resources. The current release provides managed `Sandbox`
 lifecycles and data-plane operations, stable Deployment control and managed
 HTTP/SSE/WebSocket connections, Tool management, and image pre-cache tasks.
 Preview prereleases additionally expose Volume and VolumeTemplate management, persistent Tool
-mounts, and SessionSpace/Session/Event control APIs.
+mounts, SessionSpace/Session/Event control APIs, and Registry/Record/Version metadata APIs.
 
 This is a new Go module, not an in-place release of `ags-go-sdk`. Existing
 users should read [Migrating from ags-go-sdk](MIGRATING_FROM_AGS_GO_SDK.md).
@@ -168,6 +168,14 @@ User. JSON state, deltas, event metadata, extensions, and function payloads are 
 bounded JSON objects. Event append mutations are not retried. See the
 [Session and Events cookbook](examples/cookbook/10_session_events/main.go).
 
+Preview releases also provide `client.Registries()`. Records are always scoped through
+`client.Registries().Records(registryID)`; there is no implicit default Registry. Version IDs and
+labels use an explicit mutually exclusive selector. Descriptor and audit JSON is copied and
+bounded to 1 MiB. `Preview` is read-only, while `Sync` is an explicit mutation and is never
+retried. A5a supports CUSTOM, MCP/A2A/AG-UI manual or URL-import sources, and inline Skill text.
+`TAR_PACKAGE`, pre-signed package URLs, upload, and download are not exposed. See the
+[Registry cookbook](examples/cookbook/11_registry_records/main.go).
+
 ## Capabilities
 
 | Area | API |
@@ -186,6 +194,7 @@ bounded JSON objects. Event append mutations are not retried. See the
 | Preview VolumeTemplate | `Create`, exact `Get`, offset `List`, `Update`, `Delete`, Tool reuse-key mounts |
 | Preview SessionSpace | `Create`, exact `Get`, offset `List`, `Update`, `Delete` |
 | Preview Session and Events | Session `Create`, exact `Get`, offset `List`, `Update`, `Delete`; Event `AppendEvent`, `ListEvents` |
+| Preview Registry | Registry and Record CRUD/List, Version decisions and labels, audit logs, explicit `Preview`/`Sync` |
 
 ## Lifecycle rules
 
@@ -210,6 +219,8 @@ bounded JSON objects. Event append mutations are not retried. See the
 - Deployment access tokens are acquired lazily, refreshed internally, redacted, and never exposed
   as public input or output. A 401 is returned to the caller and invalidates the cached token; the
   SDK does not replay the request.
+- Registry and Record values are account-level control-plane snapshots and do not need `Close`.
+  Delete Records before their Registry. Registry mutations and `Sync` are not retried.
 
 Create and Resume accept whole-second lifetimes from 30 seconds through 24 hours. Update uses
 a 300-second minimum. Connect reads state first: a paused instance follows Resume rules and a
