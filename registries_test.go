@@ -236,6 +236,29 @@ func TestRegistryPaginationAndIdentityIsolation(t *testing.T) {
 	}
 }
 
+func TestRegistryUnknownEnumsArePreserved(t *testing.T) {
+	control := &registryTestControl{}
+	client := newRegistryTestClient(t, control)
+	registry, err := client.Registries().Create(context.Background(), CreateRegistryOptions{Name: "registry"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if registry.Status != RegistryStatus("FUTURE") {
+		t.Fatalf("Registry status=%q", registry.Status)
+	}
+	record, err := client.Registries().Records("reg").Create(context.Background(), CreateRegistryRecordOptions{
+		Name:              "custom",
+		DescriptorType:    RegistryDescriptorCustom,
+		CustomDescriptors: json.RawMessage(`{"kind":"custom"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Version == nil || record.Version.Status != RegistryVersionStatus("FUTURE") {
+		t.Fatalf("Version=%#v", record.Version)
+	}
+}
+
 func TestRegistryJSONLimitAndURLValidation(t *testing.T) {
 	control := &registryTestControl{}
 	records := newRegistryTestClient(t, control).Registries().Records("reg")
