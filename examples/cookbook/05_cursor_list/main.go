@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	agr "github.com/TencentCloudAgentRuntime/agr-go-sdk"
@@ -15,19 +17,17 @@ func run() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	opts := agr.SandboxPageOptions{MaxResults: 20, NeedTotalCount: true}
+	iterator := client.Sandboxes().Iterate(agr.SandboxPageOptions{MaxResults: 20})
+	defer iterator.Close()
 	for {
-		page, err := client.Sandboxes().ListPage(ctx, opts)
+		item, err := iterator.Next(ctx)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
-		for _, item := range page.Items {
-			fmt.Printf("%s %s\n", item.ID, item.State)
-		}
-		if page.NextToken == "" {
-			return nil
-		}
-		opts.NextToken = page.NextToken
+		fmt.Printf("%s %s\n", item.ID, item.State)
 	}
 }
 

@@ -26,14 +26,17 @@ type Service struct {
 }
 
 type ServiceConfig struct {
-	Region, ControlEndpoint, MonitorEndpoint string
-	Timeout                                  time.Duration
-	HTTPClient                               *http.Client
-	Credential                               CredentialSource
-	RuntimeSource                            dataplane.AccessTokenSource
+	Region, ControlEndpoint, MonitorEndpoint, SandboxDomain string
+	Timeout                                                 time.Duration
+	HTTPClient                                              *http.Client
+	Credential                                              CredentialSource
+	RuntimeSource                                           dataplane.AccessTokenSource
 }
 
 func NewService(config ServiceConfig) *Service {
+	if config.SandboxDomain == "" {
+		config.SandboxDomain = config.Region + ".tencentags.com"
+	}
 	client := cloneHTTPClient(config.HTTPClient)
 	agsAPI := NewAGS(Config{Region: config.Region, Endpoint: config.ControlEndpoint, Timeout: config.Timeout, Transport: client.Transport}, config.Credential)
 	monitorAPI := NewMonitor(Config{Region: config.Region, Endpoint: config.MonitorEndpoint, Timeout: config.Timeout, Transport: client.Transport}, config.Credential)
@@ -41,7 +44,7 @@ func NewService(config ServiceConfig) *Service {
 	if source == nil {
 		source = agsAPI
 	}
-	return &Service{timeout: config.Timeout, ags: agsAPI, monitor: monitorAPI, runtime: dataplane.NewCloudConnector(config.Region, source, client), registryTransfer: registrytransfer.New(client)}
+	return &Service{timeout: config.Timeout, ags: agsAPI, monitor: monitorAPI, runtime: dataplane.NewCloudConnector(config.SandboxDomain, source, client), registryTransfer: registrytransfer.New(client)}
 }
 
 func cloneHTTPClient(client *http.Client) *http.Client {

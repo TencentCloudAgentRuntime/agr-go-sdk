@@ -116,6 +116,24 @@ defer sb.Close()
 The shortcut and explicit Client paths return the same `*agr.Sandbox` type and share the same
 implementation.
 
+For a Sandbox data-plane hostname suffix other than the regional default, set
+`agr.WithSandboxDomain("ap-guangzhou.example.com")` on that Client. The value is a complete
+hostname suffix, without a scheme or port. `sb.GetHost(8080)` then returns
+`8080-<sandbox-id>.ap-guangzhou.example.com`, and SDK file, command, and Code connections use
+the same suffix. `WithControlPlaneEndpoint` configures the separate Cloud API address;
+`WithDataPlaneDomain` retains its existing Deployment-only meaning. The domain must have working
+DNS, TLS, and routing; `GetHost` does not check whether the Tool exposes port 8080. See the
+[explicit Client cookbook](examples/cookbook/02_explicit_client/main.go).
+
+For a small UTF-8 file, `sb.Files().ReadText(ctx, path, agr.ReadOptions{}, maxBytes)` closes the
+stream and rejects content beyond the positive `maxBytes` limit, which may be at most 16 MiB.
+Use streaming `Read` for larger or binary files. To traverse Sandbox cursor pages lazily, call
+`iterator := client.Sandboxes().Iterate(options)`, then `iterator.Next(ctx)` until `io.EOF` and
+`defer iterator.Close()`. The iterator retains at most one page, supports cancellation, and does
+not promise a snapshot of the changing remote list. `ListPage` remains available when the caller
+needs explicit cursor control. See the [file cookbook](examples/cookbook/01_default/main.go) and
+[list cookbook](examples/cookbook/05_cursor_list/main.go).
+
 Tool and pre-cache operations are available only from the explicit Client because they are
 account-level control-plane resources:
 
@@ -183,8 +201,8 @@ and [Skill package cookbook](examples/cookbook/12_registry_skill_package/main.go
 
 | Area | API |
 | --- | --- |
-| Sandbox control | `Create`, `Connect`, `Get`, offset `List`, cursor `ListPage`, `Pause`, `Resume`, `WaitFor`, `Update`, `Delete` |
-| Files | streaming `Read`/`Write`, `Stat`, `Exists`, `List`, `MakeDir`, `Move`, `Remove`, `Watch` |
+| Sandbox control | `Create`, `Connect`, `Get`, offset `List`, cursor `ListPage`/`Iterate`, `Pause`, `Resume`, `WaitFor`, `Update`, `Delete` |
+| Files | streaming `Read`/`Write`, bounded UTF-8 `ReadText`, `Stat`, `Exists`, `List`, `MakeDir`, `Move`, `Remove`, `Watch` |
 | Commands | `Run`, `Start`, `List`, `Connect`, bounded output, input and signals |
 | Code | `Run`, managed contexts, explicit external context references, bounded callbacks |
 | PTY | start barrier, input, resize, bounded event stream |

@@ -8,6 +8,9 @@ source-incompatible changes.
 
 ### Added
 
+- Client-scoped Sandbox domain configuration shared by public port hosts and runtime connections,
+  bounded UTF-8 file text reads, and lazy cancelable Sandbox cursor iteration.
+
 - A new `github.com/TencentCloudAgentRuntime/agr-go-sdk` module with root
   package `agr`.
 - A product-level `agr.Client` and canonical `agr.Sandbox` resource.

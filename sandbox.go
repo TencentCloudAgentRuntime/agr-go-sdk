@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"time"
+	"unicode/utf8"
 
 	"github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/model"
 	internalruntime "github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/runtime"
@@ -82,7 +83,7 @@ func (s *Sandbox) GetHost(port int) (string, error) {
 	if port < 1 || port > 65535 {
 		return "", codeError(InvalidArgument, "Sandbox.GetHost", "PORT_OUT_OF_RANGE")
 	}
-	return fmt.Sprintf("%d-%s.%s.tencentags.com", port, s.id, s.client.cfg.region), nil
+	return fmt.Sprintf("%d-%s.%s", port, s.id, s.client.cfg.sandboxDomain), nil
 }
 
 // Files returns the filesystem service bound to this Sandbox. The service follows
@@ -259,6 +260,38 @@ func (f *Files) Read(ctx context.Context, path string, opts ReadOptions) (io.Rea
 		return nil, e
 	}
 	return p.Read(ctx, path, string(opts.User))
+}
+
+// ReadText reads a small UTF-8 file and closes its stream. maxBytes must be
+// positive and at most 16 MiB; use Read for larger or non-text content.
+func (f *Files) ReadText(ctx context.Context, path string, opts ReadOptions, maxBytes int64) (result string, err error) {
+	const largestTextFile = 16 << 20
+	if maxBytes < 1 || maxBytes > largestTextFile {
+		return "", codeError(InvalidArgument, "Files.ReadText", "TEXT_LIMIT_OUT_OF_RANGE")
+	}
+	stream, err := f.Read(ctx, path, opts)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if closeErr := stream.Close(); err == nil && closeErr != nil {
+			result, err = "", normalizeError("Files.ReadText", closeErr)
+		}
+	}()
+	content, err := io.ReadAll(io.LimitReader(stream, maxBytes+1))
+	if err != nil {
+		return "", normalizeError("Files.ReadText", err)
+	}
+	if ctx.Err() != nil {
+		return "", normalizeError("Files.ReadText", ctx.Err())
+	}
+	if int64(len(content)) > maxBytes {
+		return "", codeError(ResourceExhausted, "Files.ReadText", "TEXT_LIMIT_EXCEEDED")
+	}
+	if !utf8.Valid(content) {
+		return "", codeError(Protocol, "Files.ReadText", "TEXT_INVALID_UTF8")
+	}
+	return string(content), nil
 }
 
 // Write incrementally uploads body to a nonempty remote path without whole-file buffering or
