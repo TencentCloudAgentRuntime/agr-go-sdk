@@ -23,15 +23,15 @@ func newDefaultTencentControlPlane(region string, credential CredentialProvider)
 }
 
 func newTencentControlPlane(region string, credential CredentialProvider, endpoint string, client *http.Client, timeout time.Duration) *controlAdapter {
-	return newControlAdapter(region, credential, endpoint, "monitor.tencentcloudapi.com", client, timeout)
+	return newControlAdapter(region, credential, endpoint, "monitor.tencentcloudapi.com", client, timeout, region+".tencentags.com")
 }
 
-func newControlAdapter(region string, credential CredentialProvider, controlEndpoint, monitorEndpoint string, client *http.Client, timeout time.Duration) *controlAdapter {
+func newControlAdapter(region string, credential CredentialProvider, controlEndpoint, monitorEndpoint string, client *http.Client, timeout time.Duration, sandboxDomain string) *controlAdapter {
 	source := func(ctx context.Context) (controlplane.Credential, error) {
 		value, err := retrieveCloudCredential(ctx, credential)
 		return controlplane.Credential{SecretID: value.SecretID, SecretKey: value.SecretKey, Token: value.Token}, err
 	}
-	return &controlAdapter{service: controlplane.NewService(controlplane.ServiceConfig{Region: region, ControlEndpoint: controlEndpoint, MonitorEndpoint: monitorEndpoint, Timeout: timeout, HTTPClient: client, Credential: source}), endpoint: controlEndpoint}
+	return &controlAdapter{service: controlplane.NewService(controlplane.ServiceConfig{Region: region, ControlEndpoint: controlEndpoint, MonitorEndpoint: monitorEndpoint, SandboxDomain: sandboxDomain, Timeout: timeout, HTTPClient: client, Credential: source}), endpoint: controlEndpoint}
 }
 
 func (c *controlAdapter) Create(ctx context.Context, opts CreateOptions) (SandboxInfo, error) {
@@ -525,7 +525,7 @@ func newTencentMonitor(region string, credential CredentialProvider, client *htt
 }
 
 func newTencentMonitorWithConfig(region string, credential CredentialProvider, endpoint string, client *http.Client, timeout time.Duration) *monitorAdapter {
-	return &monitorAdapter{newControlAdapter(region, credential, "ags.tencentcloudapi.com", endpoint, client, timeout)}
+	return &monitorAdapter{newControlAdapter(region, credential, "ags.tencentcloudapi.com", endpoint, client, timeout, region+".tencentags.com")}
 }
 
 func (m *monitorAdapter) Query(ctx context.Context, q monitorRequest) (monitorResponse, error) {

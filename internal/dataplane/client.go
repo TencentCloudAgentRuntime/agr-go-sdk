@@ -14,8 +14,6 @@ import (
 	processconnect "github.com/TencentCloudAgentRuntime/agr-go-sdk/internal/gen/process/processconnect"
 )
 
-const runtimeDomain = "tencentags.com"
-
 // AccessTokenSource obtains connection material for one Sandbox generation.
 // Implementations remain behind internal package boundaries.
 type AccessTokenSource interface {
@@ -25,14 +23,14 @@ type AccessTokenSource interface {
 // CloudConnector resolves Cloud-managed Sandbox connection material without
 // exposing the endpoint or instance token to the root SDK package.
 type CloudConnector struct {
-	region     string
+	domain     string
 	source     AccessTokenSource
 	httpClient *http.Client
 }
 
 // NewCloudConnector creates a private connector for one Client identity.
-func NewCloudConnector(region string, source AccessTokenSource, httpClient *http.Client) *CloudConnector {
-	return &CloudConnector{region: region, source: source, httpClient: httpClient}
+func NewCloudConnector(domain string, source AccessTokenSource, httpClient *http.Client) *CloudConnector {
+	return &CloudConnector{domain: domain, source: source, httpClient: httpClient}
 }
 
 // Connect resolves an instance token and creates an immutable wire client.
@@ -52,7 +50,7 @@ func (c *CloudConnector) Connect(ctx context.Context, instanceID string) (*Clien
 		*httpClient = *c.httpClient
 		httpClient.Timeout = 0
 	}
-	baseURL := fmt.Sprintf("https://49983-%s.%s.%s", instanceID, c.region, runtimeDomain)
+	baseURL := fmt.Sprintf("https://49983-%s.%s", instanceID, c.domain)
 	return New(baseURL, accessToken, httpClient), nil
 }
 

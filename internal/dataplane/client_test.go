@@ -24,7 +24,7 @@ func TestCloudConnectorOwnsRuntimeConnectionMaterial(t *testing.T) {
 	baseClient := &http.Client{Timeout: 30 * time.Second, Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("not used")
 	})}
-	connector := NewCloudConnector("ap-guangzhou", accessTokenSourceFunc(func(_ context.Context, instanceID string) (string, error) {
+	connector := NewCloudConnector("ap-guangzhou.tencentags.com", accessTokenSourceFunc(func(_ context.Context, instanceID string) (string, error) {
 		acquiredID = instanceID
 		return "private-token", nil
 	}), baseClient)
@@ -48,7 +48,7 @@ func TestCloudConnectorOwnsRuntimeConnectionMaterial(t *testing.T) {
 }
 
 func TestCloudConnectorRejectsMissingTokenAndPreservesSourceError(t *testing.T) {
-	connector := NewCloudConnector("ap-guangzhou", accessTokenSourceFunc(func(context.Context, string) (string, error) {
+	connector := NewCloudConnector("ap-guangzhou.tencentags.com", accessTokenSourceFunc(func(context.Context, string) (string, error) {
 		return "", nil
 	}), nil)
 	_, err := connector.Connect(context.Background(), "sandbox-id")
@@ -58,7 +58,7 @@ func TestCloudConnectorRejectsMissingTokenAndPreservesSourceError(t *testing.T) 
 	}
 
 	sourceErr := errors.New("source failure")
-	connector = NewCloudConnector("ap-guangzhou", accessTokenSourceFunc(func(context.Context, string) (string, error) {
+	connector = NewCloudConnector("ap-guangzhou.tencentags.com", accessTokenSourceFunc(func(context.Context, string) (string, error) {
 		return "", sourceErr
 	}), nil)
 	if _, err = connector.Connect(context.Background(), "sandbox-id"); !errors.Is(err, sourceErr) {

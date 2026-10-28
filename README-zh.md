@@ -109,6 +109,23 @@ defer sb.Close()
 快捷入口和显式 Client 都返回 `*agr.Sandbox`，并调用同一套控制面、Metrics、生命周期
 和数据面实现。
 
+如果 Sandbox 使用自定义数据面域名后缀，在对应 Client 上设置
+`agr.WithSandboxDomain("ap-guangzhou.example.com")`。传入完整主机名后缀，不带协议和端口。
+此时 `sb.GetHost(8080)` 返回 `8080-<sandbox-id>.ap-guangzhou.example.com`，SDK 内部文件、
+命令和 Code 连接也使用同一后缀。`WithControlPlaneEndpoint` 单独设置云 API 地址；
+`WithDataPlaneDomain` 仍只影响 Deployment。自定义域名需要实际可用的 DNS、TLS 和路由；
+`GetHost` 不探测 Tool 是否开放 8080 端口。参见
+[显式 Client Cookbook](examples/cookbook/02_explicit_client/main.go)。
+
+读取小型 UTF-8 文件可用 `sb.Files().ReadText(ctx, path, agr.ReadOptions{}, maxBytes)`：
+SDK 会关闭流，并在超过显式大小上限时报错；`maxBytes` 必须为正且不超过 16 MiB。
+大文件或二进制文件继续使用流式 `Read`。跨页遍历沙箱可用
+`iterator := client.Sandboxes().Iterate(options)`，调用 `iterator.Next(ctx)` 直到 `io.EOF`，
+并使用 `defer iterator.Close()`。迭代器最多保留一页，可取消，不保证变化中的远端列表具有
+快照语义；需要自行控制游标时继续使用 `ListPage`。参见
+[文件 Cookbook](examples/cookbook/01_default/main.go) 和
+[列表 Cookbook](examples/cookbook/05_cursor_list/main.go)。
+
 Tool 和预热任务是账号级控制面资源，只通过显式 Client 提供：
 
 ```go
@@ -151,8 +168,8 @@ Cookbook 用户旅程齐备后才会作为同级服务加入；仓库不发布�
 
 | 范围 | API |
 | --- | --- |
-| Sandbox 控制面 | `Create`、`Connect`、`Get`、偏移量 `List`、游标 `ListPage`、`Pause`、`Resume`、`WaitFor`、`Update`、`Delete` |
-| 文件 | 流式 `Read`/`Write`、`Stat`、`Exists`、`List`、`MakeDir`、`Move`、`Remove`、`Watch` |
+| Sandbox 控制面 | `Create`、`Connect`、`Get`、偏移量 `List`、游标 `ListPage`/`Iterate`、`Pause`、`Resume`、`WaitFor`、`Update`、`Delete` |
+| 文件 | 流式 `Read`/`Write`、有界 UTF-8 `ReadText`、`Stat`、`Exists`、`List`、`MakeDir`、`Move`、`Remove`、`Watch` |
 | 命令 | `Run`、`Start`、`List`、`Connect`、有界输出、输入和信号 |
 | Code | `Run`、受管理 Context、显式外部 Context 引用、有界回调 |
 | PTY | 启动屏障、输入、窗口调整、有界事件流 |

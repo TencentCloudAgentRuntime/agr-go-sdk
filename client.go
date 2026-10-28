@@ -18,15 +18,17 @@ import (
 // not an extension API.
 type ClientOption func(*clientConfig)
 type clientConfig struct {
-	region          string
-	credential      CredentialProvider
-	timeout         time.Duration
-	control         controlPlane
-	monitor         monitorTransport
-	controlEndpoint string
-	monitorEndpoint string
-	dataPlaneDomain string
-	httpClient      *http.Client
+	region           string
+	credential       CredentialProvider
+	timeout          time.Duration
+	control          controlPlane
+	monitor          monitorTransport
+	controlEndpoint  string
+	monitorEndpoint  string
+	dataPlaneDomain  string
+	sandboxDomain    string
+	sandboxDomainSet bool
+	httpClient       *http.Client
 }
 
 // WithRegion selects the nonempty Tencent Cloud region, overriding TENCENTCLOUD_REGION.
@@ -72,6 +74,13 @@ func WithMonitorEndpoint(v string) ClientOption {
 // The default is tencentags.com. Pass a hostname only, without a scheme, port, or path.
 func WithDataPlaneDomain(v string) ClientOption {
 	return func(c *clientConfig) { c.dataPlaneDomain = v }
+}
+
+// WithSandboxDomain selects the complete Sandbox data-plane hostname suffix,
+// such as ap-guangzhou.tencentags.com. It affects public port hosts and runtime
+// connections, but not Cloud endpoints or Deployment data-plane connections.
+func WithSandboxDomain(v string) ClientOption {
+	return func(c *clientConfig) { c.sandboxDomain, c.sandboxDomainSet = v, true }
 }
 
 // WithHTTPClient supplies trusted HTTP configuration; nil uses SDK defaults. The SDK rejects
@@ -136,13 +145,19 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	if !validDataPlaneDomain(c.dataPlaneDomain) {
 		return nil, codeError(InvalidArgument, "NewClient", "DATA_PLANE_DOMAIN_INVALID")
 	}
+	if !c.sandboxDomainSet {
+		c.sandboxDomain = c.region + ".tencentags.com"
+	}
+	if !validDataPlaneDomain(c.sandboxDomain) {
+		return nil, codeError(InvalidArgument, "NewClient", "SANDBOX_DOMAIN_INVALID")
+	}
 	c.httpClient = noRedirectClient(c.httpClient)
 	if c.credential == nil {
 		return nil, codeError(InvalidArgument, "NewClient", "CREDENTIAL_PROVIDER_REQUIRED")
 	}
 	var adapter *controlAdapter
 	if c.control == nil || c.monitor == nil {
-		adapter = newControlAdapter(c.region, c.credential, c.controlEndpoint, c.monitorEndpoint, c.httpClient, c.timeout)
+		adapter = newControlAdapter(c.region, c.credential, c.controlEndpoint, c.monitorEndpoint, c.httpClient, c.timeout, c.sandboxDomain)
 	}
 	if c.control == nil {
 		c.control = adapter
@@ -292,6 +307,89 @@ func (m *SandboxManager) ListPage(ctx context.Context, opts SandboxPageOptions) 
 	}
 	return cursor.ListPage(ctx, opts)
 }
+
+// SandboxIterator fetches one cursor page at a time and retains at most one
+// page. It is not a snapshot: changes to the remote list may affect later pages.
+// Call Close when stopping before io.EOF.
+type SandboxIterator struct {
+	manager *SandboxManager
+	mu      sync.Mutex
+	ctx     context.Context
+	cancel  context.CancelFunc
+	opts    SandboxPageOptions
+	items   []SandboxInfo
+	started bool
+	done    bool
+	closed  bool
+}
+
+// Iterate returns a lazy cursor iterator with a copy of the query options.
+// Each Next call may issue a Cloud request; errors leave the cursor unchanged.
+func (m *SandboxManager) Iterate(opts SandboxPageOptions) *SandboxIterator {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &SandboxIterator{manager: m, ctx: ctx, cancel: cancel, opts: copyPageOptions(opts)}
+}
+
+// Next returns one Sandbox or io.EOF after the final page or Close. A canceled
+// call returns a typed cancellation error and does not reset the cursor.
+func (it *SandboxIterator) Next(ctx context.Context) (SandboxInfo, error) {
+	if ctx == nil {
+		return SandboxInfo{}, codeError(InvalidArgument, "Sandboxes.Iterate", "CONTEXT_REQUIRED")
+	}
+	it.mu.Lock()
+	defer it.mu.Unlock()
+	if it.closed {
+		return SandboxInfo{}, io.EOF
+	}
+	for emptyPages := 0; ; {
+		if err := ctx.Err(); err != nil {
+			return SandboxInfo{}, normalizeError("Sandboxes.Iterate", err)
+		}
+		if len(it.items) > 0 {
+			item := it.items[0]
+			it.items = it.items[1:]
+			return item, nil
+		}
+		if it.done || it.started && it.opts.NextToken == "" {
+			it.done = true
+			return SandboxInfo{}, io.EOF
+		}
+		previousToken := it.opts.NextToken
+		requestCtx, cancel := context.WithCancel(ctx)
+		stop := context.AfterFunc(it.ctx, cancel)
+		page, err := it.manager.ListPage(requestCtx, it.opts)
+		stop()
+		cancel()
+		if it.closed || it.ctx.Err() != nil {
+			return SandboxInfo{}, codeError(Canceled, "Sandboxes.Iterate", "ITERATOR_CLOSED")
+		}
+		if err != nil {
+			return SandboxInfo{}, err
+		}
+		it.started = true
+		it.items = page.Items
+		it.opts.NextToken = page.NextToken
+		if len(it.items) == 0 && it.opts.NextToken != "" {
+			if it.opts.NextToken == previousToken || emptyPages >= 15 {
+				it.done = true
+				return SandboxInfo{}, codeError(Protocol, "Sandboxes.Iterate", "EMPTY_CURSOR_LOOP")
+			}
+			emptyPages++
+		}
+	}
+}
+
+// Close cancels an in-flight Next request and releases the buffered page.
+// It does not change any remote Sandbox.
+func (it *SandboxIterator) Close() error {
+	it.cancel()
+	it.mu.Lock()
+	it.closed = true
+	it.items = nil
+	it.mu.Unlock()
+	return nil
+}
+
 func (m *SandboxManager) connected(ctx context.Context, info SandboxInfo) (*Sandbox, error) {
 	for info.State != Running {
 		if info.State == Failed || info.State == Stopped {
