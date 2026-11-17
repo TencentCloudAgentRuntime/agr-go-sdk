@@ -66,11 +66,18 @@ func New(config Config) (*Connection, error) {
 	if config.Port < 1 || config.Port > 65535 {
 		return nil, errors.New("deployment port is out of range")
 	}
+	// These values become URL authority components. Validate them before building
+	// the target so URL delimiters cannot redirect a request to another host.
+	if !validHostLabel(config.DeploymentID) || !validHostLabel(config.Region) ||
+		!validHostName(config.Domain) || len(fmt.Sprintf("%d-%s", config.Port, config.DeploymentID)) > 63 {
+		return nil, errors.New("deployment connection target is invalid")
+	}
 	client := &http.Client{}
 	if config.HTTPClient != nil {
 		*client = *config.HTTPClient
 	}
 	client.Timeout = 0
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	ctx, cancel := context.WithCancel(context.Background())
 	value := &Connection{
 		id:      config.DeploymentID,
@@ -87,7 +94,36 @@ func New(config Config) (*Connection, error) {
 	return value, nil
 }
 
+func validHostLabel(value string) bool {
+	if len(value) == 0 || len(value) > 63 || value[0] == '-' || value[len(value)-1] == '-' {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		ch := value[i]
+		if ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9' || ch == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validHostName(value string) bool {
+	if len(value) == 0 || len(value) > 253 {
+		return false
+	}
+	for _, label := range strings.Split(value, ".") {
+		if !validHostLabel(label) {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Connection) Do(ctx context.Context, in Request) (*http.Response, error) {
+	if in.Method == "" || !ValidatePath(in.Path) {
+		return nil, errors.New("deployment request is invalid")
+	}
 	requestCtx, cancel, err := c.operationContext(ctx)
 	if err != nil {
 		return nil, err
@@ -143,6 +179,9 @@ func (c *Connection) Do(ctx context.Context, in Request) (*http.Response, error)
 }
 
 func (c *Connection) DialWebSocket(ctx context.Context, path string, headers http.Header) (*WebSocket, *http.Response, error) {
+	if !ValidatePath(path) {
+		return nil, nil, errors.New("deployment websocket path is invalid")
+	}
 	requestCtx, cancel, err := c.operationContext(ctx)
 	if err != nil {
 		return nil, nil, err

@@ -379,6 +379,54 @@ func TestValidatePathRejectsForeignAuthorities(t *testing.T) {
 	}
 }
 
+func TestNewRejectsAuthorityInjection(t *testing.T) {
+	base := Config{DeploymentID: "dpl-a1b2c3d4", Region: "ap-guangzhou", Domain: "tencentags.com", Port: 8080, TokenSource: validTokenSource}
+	tests := []struct {
+		name   string
+		change func(*Config)
+	}{
+		{"deployment ID userinfo", func(c *Config) { c.DeploymentID = "x@127.0.0.1/" }},
+		{"deployment ID path", func(c *Config) { c.DeploymentID = "x/elsewhere" }},
+		{"region userinfo", func(c *Config) { c.Region = "ap@127.0.0.1/" }},
+		{"domain userinfo", func(c *Config) { c.Domain = "example.com@127.0.0.1/" }},
+		{"oversized first label", func(c *Config) { c.DeploymentID = strings.Repeat("a", 60) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := base
+			tt.change(&config)
+			if connection, err := New(config); err == nil {
+				_ = connection.Close()
+				t.Fatal("accepted a target that can change the URL authority")
+			}
+		})
+	}
+	connection, err := New(base)
+	if err != nil {
+		t.Fatalf("rejected a valid deployment target: %v", err)
+	}
+	_ = connection.Close()
+}
+
+func TestConnectionDoesNotFollowHTTPRedirect(t *testing.T) {
+	var requests atomic.Int32
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		http.Redirect(w, r, "https://foreign.invalid/", http.StatusFound)
+	}))
+	defer upstream.Close()
+	connection := newTestConnection(t, upstream, Config{DeploymentID: "dpl-a1b2c3d4", Region: "ap-test", Domain: "example.test", Port: 8080, TokenSource: validTokenSource})
+	defer connection.Close()
+	response, err := connection.Do(context.Background(), Request{Method: http.MethodGet, Path: "/redirect"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusFound || requests.Load() != 1 {
+		t.Fatalf("redirect was followed: status=%d requests=%d", response.StatusCode, requests.Load())
+	}
+}
+
 func TestTokenErrorsDoNotContainToken(t *testing.T) {
 	connection, err := New(Config{DeploymentID: "dpl", Region: "ap", Domain: "example.test", Port: 1, TokenSource: func(context.Context, string) (Token, error) {
 		return Token{Value: "dpt_should_not_leak", ExpiresAt: time.Time{}}, nil
