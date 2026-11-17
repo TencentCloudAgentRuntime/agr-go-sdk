@@ -9,7 +9,7 @@ Preview 预发布版本还提供 Volume、VolumeTemplate、SessionSpace、Sessio
 Registry/Record/Version 接口、受管理的 Skill 包传输和 Tool 持久卷挂载。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
-[从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
+[从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK-zh.md)。后续一级资源只有在公开服务契约和
 用户旅程通过评审后才会加入；仓库不提供占位 API。
 
 ## 使用条件
