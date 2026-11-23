@@ -1,6 +1,6 @@
 module github.com/TencentCloudAgentRuntime/agr-go-sdk
 
-go 1.22
+go 1.23
 
 require (
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/ags v1.3.179
@@ -10,7 +10,7 @@ require (
 
 require (
 	connectrpc.com/connect v1.18.1
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.12
 )
 
 require github.com/gorilla/websocket v1.5.3
