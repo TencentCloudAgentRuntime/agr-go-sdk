@@ -1,9 +1,13 @@
 package agr // import "github.com/TencentCloudAgentRuntime/agr-go-sdk"
 
 Package agr provides the native Go SDK for Tencent Cloud Agent Runtime.
-Client is the product-level entry point; Sandbox is the first implemented
-resource and provides lifecycle, files, processes, PTY, watch, code execution,
-and Cloud Monitor metrics.
+Client is the product-level entry point for Tencent Cloud credentials, regions,
+transport policy, and first-class resources. Stable resources cover managed
+Sandboxes (lifecycle, files, processes, PTY, watch, code execution, and Cloud
+Monitor metrics), Tools, image pre-cache tasks, and Deployments (control plane
+and managed HTTP/SSE/WebSocket data-plane connections). Preview prereleases
+additionally expose Volume, VolumeTemplate, SessionSpace, Session/Event,
+and Registry/Record/Skill-package managers.
 
 Construct a Client with explicit region and credential options for services
 that use multiple accounts. The sandbox subpackage exposes environment-backed
@@ -123,6 +127,12 @@ func WithRequestTimeout(v time.Duration) ClientOption
     WithRequestTimeout sets a positive per-request timeout (default 30 seconds).
     Use context deadlines to bound orchestration and stream lifetime; this is
     not a sandbox lifetime.
+
+func WithSandboxDomain(v string) ClientOption
+    WithSandboxDomain selects the complete Sandbox data-plane hostname suffix,
+    such as ap-guangzhou.tencentags.com. It affects public port hosts and
+    runtime connections, but not Cloud endpoints or Deployment data-plane
+    connections.
 
 func WithTemporaryCredential(v TemporaryCloudCredential) ClientOption
     WithTemporaryCredential explicitly selects Cloud control using a static
@@ -1034,6 +1044,10 @@ func (f *Files) Read(ctx context.Context, path string, opts ReadOptions) (io.Rea
     reader even after a partial read; its context and sandbox generation govern
     its lifetime.
 
+func (f *Files) ReadText(ctx context.Context, path string, opts ReadOptions, maxBytes int64) (result string, err error)
+    ReadText reads a small UTF-8 file and closes its stream. maxBytes must be
+    positive and at most 16 MiB; use Read for larger or non-text content.
+
 func (f *Files) Remove(ctx context.Context, path string, opts RemoveOptions) error
     Remove removes a remote entry. Cancellation does not establish that removal
     was not applied.
@@ -1532,6 +1546,21 @@ type SandboxInfo struct {
 }
     SandboxInfo is a control-plane description.
 
+type SandboxIterator struct {
+	// Has unexported fields.
+}
+    SandboxIterator fetches one cursor page at a time and retains at most one
+    page. It is not a snapshot: changes to the remote list may affect later
+    pages. Call Close when stopping before io.EOF.
+
+func (it *SandboxIterator) Close() error
+    Close cancels an in-flight Next request and releases the buffered page.
+    It does not change any remote Sandbox.
+
+func (it *SandboxIterator) Next(ctx context.Context) (SandboxInfo, error)
+    Next returns one Sandbox or io.EOF after the final page or Close. A canceled
+    call returns a typed cancellation error and does not reset the cursor.
+
 type SandboxListOptions struct {
 	// ToolID filters by exact tool identity.
 	ToolID string
@@ -1572,6 +1601,10 @@ func (m *SandboxManager) Get(ctx context.Context, id string) (SandboxInfo, error
 
 func (m *SandboxManager) GetMetrics(ctx context.Context, id string, q MetricsQuery) (MetricsResult, error)
     GetMetrics queries Cloud Monitor without connecting the sandbox data plane.
+
+func (m *SandboxManager) Iterate(opts SandboxPageOptions) *SandboxIterator
+    Iterate returns a lazy cursor iterator with a copy of the query options.
+    Each Next call may issue a Cloud request; errors leave the cursor unchanged.
 
 func (m *SandboxManager) List(ctx context.Context, opts SandboxListOptions) (SandboxPage, error)
     List returns one server-filtered Cloud page. Limit defaults to 20.
@@ -2298,3 +2331,4 @@ type SandboxState = agr.SandboxState
 type ToolRef = agr.ToolRef
     Public aliases keep the shortcut API compact while preserving one canonical
     resource and model implementation in the root agr package.
+

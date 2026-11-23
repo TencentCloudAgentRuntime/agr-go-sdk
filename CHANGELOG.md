@@ -6,11 +6,12 @@ source-incompatible changes.
 
 ## Unreleased
 
+## [v0.1.0] - 2026-11-23
+
 ### Added
 
 - Client-scoped Sandbox domain configuration shared by public port hosts and runtime connections,
   bounded UTF-8 file text reads, and lazy cancelable Sandbox cursor iteration.
-
 - A new `github.com/TencentCloudAgentRuntime/agr-go-sdk` module with root
   package `agr`.
 - A product-level `agr.Client` and canonical `agr.Sandbox` resource.
@@ -43,6 +44,15 @@ source-incompatible changes.
   maturity, transport route, request/response types, and per-Action object closures.
 - Tencent Cloud AGS and common modules are updated to 1.3.179.
 - The stable and preview control-plane allowlists contain 19 typed Actions and no raw fallback.
+
+### Fixed
+
+- Bounded Deployment WebSocket reads and preserved caller transport ownership.
+- Validated Deployment data-plane target authority (port, Deployment ID, region, and domain)
+  before constructing HTTPS and WebSocket requests.
+- Aligned `LICENSE` third-party attribution (`gorilla/websocket` BSD-2-Clause and derived
+  `e2b-dev/infra` proto notices), public `CODE_OF_CONDUCT` contact guidance, package GoDoc,
+  Chinese migration guide, and repository community templates.
 
 ### Removed
 

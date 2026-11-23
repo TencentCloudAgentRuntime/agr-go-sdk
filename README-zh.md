@@ -7,7 +7,7 @@
 控制面与 HTTP/SSE/WebSocket 连接、稳定的 Tool 管理能力，以及镜像预热任务。
 
 这是一个新的 Go module，不是 `ags-go-sdk` 的原地升级版本。现有用户应先阅读
-[从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK.md)。后续一级资源只有在公开服务契约和
+[从 ags-go-sdk 迁移](MIGRATING_FROM_AGS_GO_SDK-zh.md)。后续一级资源只有在公开服务契约和
 用户旅程通过评审后才会加入；仓库不提供占位 API。
 
 ## 使用条件

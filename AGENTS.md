@@ -9,15 +9,17 @@ Keep every tracked file suitable for a public source repository.
   root package name `agr`.
 - `Client` is the product-level root for credentials, region, endpoints,
   transport policy, and first-class resources.
-- `Sandbox` is the first implemented resource. Its Files, Commands, Code, PTY,
-  Watch, Metrics, and lifecycle APIs remain generation-bound capabilities of
-  that resource.
+- Stable resources are `Sandbox` (with generation-bound Files, Commands, Code,
+  PTY, Watch, Metrics, and lifecycle APIs), `Tool`, `PreCacheImage`, and
+  `Deployment` (control plane and managed HTTP/SSE/WebSocket connections).
+  Preview prereleases additionally expose `Volume`, `VolumeTemplate`,
+  `SessionSpace`, `Session`/Events, and `Registry`/Record/Skill-package APIs.
 - The `sandbox` package contains only environment-backed shortcuts that return
   the same `*agr.Sandbox` type as `Client.Sandboxes()`.
-- Do not add placeholder services for Volume, Deployment, Session, Registry,
-  or another future resource. A resource enters the public API only with
-  a reviewed public service contract, lifecycle and error semantics, a
-  cookbook journey, deterministic tests, and release documentation.
+- Do not add placeholder services for unreviewed future resources. A new
+  resource enters the public API only with a reviewed public service contract,
+  lifecycle and error semantics, a cookbook journey, deterministic tests, and
+  release documentation.
 
 The Cloud service and endpoint can retain the AGS protocol name. Do not rename
 wire Actions, API versions, endpoints, metric namespaces, or copied contract
