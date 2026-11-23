@@ -6,6 +6,12 @@ source-incompatible changes.
 
 ## Unreleased
 
+## [v0.2.0-preview.1] - 2026-11-23
+
+Preview prerelease built on the `v0.1.0` stable surface, adding experimental
+Volume, VolumeTemplate, SessionSpace, Session/Events, and Registry/Skill-package
+APIs.
+
 ### Added
 
 - Client-scoped Sandbox domain configuration shared by public port hosts and runtime connections,
