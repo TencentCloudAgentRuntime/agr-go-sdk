@@ -1,0 +1,51 @@
+name: Bug report
+description: Report reproducible SDK behavior that differs from the documented contract.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not include credentials, tokens, sandbox IDs, customer data, or private response bodies.
+        Report security issues through the private process in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: SDK version or commit
+      placeholder: v0.1.0-preview.1 or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: go
+    attributes:
+      label: Go version
+      placeholder: go version
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Redact all identifiers and sensitive values.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Prefer synthetic values and state whether the operation may mutate cloud resources.
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Data hygiene
+      options:
+        - label: I removed credentials, tokens, resource identifiers, customer data, and private response bodies.
+          required: true

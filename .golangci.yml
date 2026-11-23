@@ -131,7 +131,7 @@ issues:
 
   # 排除目录 (替代已弃用的 run.skip-dirs)
   exclude-dirs:
-    - pb
+    - internal/gen
 
   # 排除文件 (替代已弃用的 run.skip-files)
   exclude-files:
@@ -150,7 +150,7 @@ issues:
         - gocyclo
 
     # example 目录放宽检查
-    - path: example/
+    - path: examples/
       linters:
         - gosec
         - errcheck

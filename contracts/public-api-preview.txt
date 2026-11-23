@@ -1,9 +1,13 @@
 package agr // import "github.com/TencentCloudAgentRuntime/agr-go-sdk"
 
 Package agr provides the native Go SDK for Tencent Cloud Agent Runtime.
-Client is the product-level entry point; Sandbox is the first implemented
-resource and provides lifecycle, files, processes, PTY, watch, code execution,
-and Cloud Monitor metrics.
+Client is the product-level entry point for Tencent Cloud credentials, regions,
+transport policy, and first-class resources. Stable resources cover managed
+Sandboxes (lifecycle, files, processes, PTY, watch, code execution, and Cloud
+Monitor metrics), Tools, image pre-cache tasks, and Deployments (control plane
+and managed HTTP/SSE/WebSocket data-plane connections). Preview prereleases
+additionally expose Volume, VolumeTemplate, SessionSpace, Session/Event,
+and Registry/Record/Skill-package managers.
 
 Construct a Client with explicit region and credential options for services
 that use multiple accounts. The sandbox subpackage exposes environment-backed

@@ -266,7 +266,7 @@ make verify
 
 Default tests are offline. Real Cloud tests require explicit opt-in and are documented in
 [CONTRIBUTING.md](CONTRIBUTING.md). Protocol and control-plane provenance is recorded under
-[`contracts/`](contracts/). The verification suite also compiles the public consumer fixtures
+[`contracts/`](contracts/). The verification suite also compiles the public consumer fixtures.
 The v2 control-plane manifest pins the CLI revision and source channel, hashes the effective
 contract, and records each Action's resource, maturity, typed route, request/response types, and
 referenced object closure.

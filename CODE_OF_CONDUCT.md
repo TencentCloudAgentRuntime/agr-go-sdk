@@ -1,5 +1,7 @@
 # Contributor Code of Conduct
 
+[中文](CODE_OF_CONDUCT-zh.md)
+
 ## Our Pledge
 
 As contributors and maintainers of this project, we pledge to provide an open, friendly, and inclusive environment for all participants. We will respect every participant regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, nationality, personal appearance, race, religion, or sexual orientation.
@@ -47,7 +49,7 @@ This Code of Conduct is adapted from the [Contributor Covenant](https://www.cont
 
 ### How do I report a violation?
 
-Please contact the project maintainers through internal communication channels, describing the details of the incident.
+Please contact the project maintainers privately through the contact information on the repository or [organization profile](https://github.com/TencentCloudAgentRuntime), describing the details of the incident. Do not post private personal details in public issues. For suspected security vulnerabilities, follow [SECURITY.md](SECURITY.md).
 
 ### What happens after a report?
 
